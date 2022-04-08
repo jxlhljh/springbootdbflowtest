@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh">
+    <head>
+        <meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>流程节点配置</title>
+        <style>
+           div,th,td {
+                font-size: 12px;
+           }
+           td a {
+               margin: 0px 2px;
+           }
+        </style>
+    </head>
+    <body>
+        <div id="content">
+            <div id="currentUser" style="color:green;font-weight:bold;font-size:14px;"></div>
+            <div><a id="backTo" href='#'>返回</a></div>
+
+            <div>&nbsp;</div>
+            <div>流程节点配置列表,<a id="addNode" href='#'>增加流程节点</a></div>
+			<table border="1" id="flowlst">
+            </table>
+        </div>
+        <script src="js/config.js"></script>
+        <script src="js/jquery.min.js"></script>
+        <script type="text/javascript">
+            var contextPath = getContextPath();
+            var userId = getQueryVariable("userId");
+            var flowKey = getQueryVariable("flowKey");
+
+            //返回按钮
+            document.getElementById("backTo").href = "./main.html?userId="+userId;
+            
+            //修改增加字段按钮的href
+            document.getElementById("addNode").href = "./flowNodeAddOrEdit.html?userId=lix&flowKey="+flowKey;
+
+            $(function() {
+                //模拟所有参与人员
+                //lix：普通人员
+                //zhaoyl：项目经理
+                //liujh,linjh,huangjc：部门经理
+                //xuw：总经理
+                let arr = ['lix', 'zhaoyl', 'liujh', 'linjh', 'huangjc', 'xuw'];
+                if(!arr.includes(userId)){
+                    alert("未合法的userId，请查看main.html里面的定义.");
+                    return;
+                }
+                //设置当前用户信息：
+                document.getElementById("currentUser").innerHTML = "你是："+userId;
+
+                //1.加载流程节点配置列表
+                $.ajax({
+                    url:  window.location.origin + contextPath + '/workFlowNodes/list',
+                    data: JSON.stringify({
+                        pageNum: 1,
+                        pageSize: 100,
+                        data: {
+                            flowKey: flowKey
+                        }
+                    }),
+                    type: 'post',
+                    contentType: 'application/json;charset=utf-8',
+                    dataType: "json",
+                    success: function (res) {
+
+                        var htmlStr = "<tr>";
+                        htmlStr += "<th>ID</th>";
+                        htmlStr += "<th>流程定义key(flow_key)</th>";
+                        htmlStr += "<th>流程节点名称(node_name)</th>";
+                        htmlStr += "<th>节点类型(node_type)</th>";
+                        htmlStr += "<th>父节点Id(parent_node_id)</th>";
+                        htmlStr += "<th>节点顺序(node_order)</th>";
+                        htmlStr += "<th>处理人(handler)</th>";
+                        htmlStr += "<th>处理人类型(handler_type)</th>";
+                        htmlStr += "<th>备注(remark)</th>";
+                        htmlStr += "<th>页面排序号(page_order)</th>";
+                        htmlStr += "<th>操作</th>";
+
+                        if(res.data.list.length >0){
+                            var list = res.data.list;
+                            for(var i=0;i<list.length;i++){
+                                htmlStr += "<tr>";
+                                htmlStr += "<td>"+list[i].id+"</td>";
+                                htmlStr += "<td>"+list[i].flowKey+"</td>";
+                                htmlStr += "<td>"+list[i].nodeName+"</td>";
+                                htmlStr += "<td>"+list[i].nodeType+"</td>";
+                                htmlStr += "<td>"+list[i].parentNodeId+"</td>";
+                                htmlStr += "<td>"+list[i].nodeOrder+"</td>";
+                                htmlStr += "<td>"+list[i].handler+"</td>";
+                                htmlStr += "<td>"+list[i].handlerType+"</td>";
+                                htmlStr += "<td>"+list[i].remark+"</td>";
+                                htmlStr += "<td>"+list[i].pageOrder+"</td>";
+                                
+                                //按钮列表
+                                htmlStr += "<td>";
+                                htmlStr += "<a href='./flowNodeAddOrEdit.html?flowKey="+flowKey+"&userId="+userId+"&id="+list[i].id+"'>编辑</a>";
+                                htmlStr += "<a href='#' onclick='deleteFlowNode("+list[i].id+")'>删除</a>";
+                                htmlStr += "</td>";
+                                htmlStr += "</tr>";
+                            
+                            }
+                            
+                        }
+
+                        document.getElementById("flowlst").innerHTML = htmlStr;
+                        
+                    },
+                    error: function (result) {alert("加载流程节点配置失败，内部错误.");}
+                });
+
+            });
+
+            //删除流程节点配置
+            function deleteFlowNode(id){
+                if (window.confirm("确认删除?")) {
+                    //删除流程节点配置
+                    $.ajax({
+                        url:  contextPath + "/workFlowNodes/delete",
+                        data: JSON.stringify({
+                            pageNum: 1,
+                            pageSize: 10,
+                            data: {
+                                ids: [id]
+                            }
+                        }),
+                        type: 'post',
+                        contentType: 'application/json;charset=utf-8',
+                        dataType: "json",
+                        success: function (res) {
+                            alert("成功删除流程节点配置");
+                            window.location.href = contextPath + "/flowNodeList.html?userId="+userId+"&flowKey="+flowKey;
+
+                        },
+                        error: function (result) {alert("删除流程节点配置失败，内部错误.");}
+                    });
+                }               
+            }
+
+            //获取浏览器地址上的url参数
+            function getQueryVariable(variable){
+                var query = window.location.search.substring(1);
+                var vars = query.split("&");
+                for (var i=0;i<vars.length;i++) {
+                    var pair = vars[i].split("=");
+                    if(pair[0] == variable){return pair[1];}
+                }
+                return "";
+            }
+
+        </script>
+    </body>
+</html>

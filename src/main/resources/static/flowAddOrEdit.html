@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh">
+    <head>
+        <meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>新增/修改流程</title>
+        <style>
+           div,th,td {
+                font-size: 12px;
+           }
+           td a {
+               margin: 0px 2px;
+           }
+        </style>
+    </head>
+    <body>
+        <div id="content">
+            <div id="currentUser" style="color:green;font-weight:bold;font-size:14px;"></div>
+
+            <div>&nbsp;</div>
+            <div id="info">新增/修改流程</div>
+
+            <div>&nbsp;</div>
+            <div>
+                <form id="flowForm">
+                    ID: <span id="flowId"></span><br/>
+                    流程定义key(flow_key)<font color="red">*</font>: <input type="text" id="flowKey"><span style="color:red;">编辑状态中请不要修改此字段的值,流程表单、流程节点设计都是以此字段的值关联的</span><br/>
+                    流程名称(flow_name)<font color="red">*</font>: <input type="text" id="flowName"><br>
+                    备注(remark): <input type="text" id="remark"><br>
+                    <input type="button" onclick="addOrEdit();" value="保存">
+                </form>
+            </div>
+
+        </div>
+        <script src="js/config.js"></script>
+        <script src="js/jquery.min.js"></script>
+        <script type="text/javascript">
+            var contextPath = getContextPath();
+            var userId = getQueryVariable("userId");
+            var id = getQueryVariable("id");
+
+            $(function() {
+                //模拟所有参与人员
+                //lix：普通人员
+                //zhaoyl：项目经理
+                //liujh,linjh,huangjc：部门经理
+                //xuw：总经理
+                let arr = ['lix', 'zhaoyl', 'liujh', 'linjh', 'huangjc', 'xuw'];
+                if(!arr.includes(userId)){
+                    alert("未合法的userId，请查看main.html里面的定义.");
+                    return;
+                }
+                //设置当前用户信息：
+                document.getElementById("currentUser").innerHTML = "你是："+userId;
+
+                //如果id不为空，则加载数据库中的数据进行填充表单
+                if(id!=""){
+                    $.ajax({
+                        url:  window.location.origin + contextPath + '/workFlow/getById',
+                        data: JSON.stringify({
+                            pageNum: 1,
+                            pageSize: 10,
+                            data: {
+                                id: id,
+                            }
+                        }),
+                        type: 'post',
+                        contentType: 'application/json;charset=utf-8',
+                        dataType: "json",
+                        success: function (res) {
+                            if(res.success){
+                                var aRow = res.data;
+                                document.getElementById("flowId").innerText = aRow.id;
+                                document.getElementById("flowKey").value = aRow.flowKey;
+                                document.getElementById("flowName").value = aRow.flowName;
+                                document.getElementById("remark").value = aRow.remark;
+                            }
+                        },
+                        error: function (result) {alert("流程加载失败，内部错误.");}
+                    });   
+                }
+
+            });
+
+            //addOrEdit
+            function addOrEdit(){
+                var id = document.getElementById("flowId").innerText;
+                var flowKey = document.getElementById("flowKey").value;
+                var flowName = document.getElementById("flowName").value;
+                var remark = document.getElementById("remark").value;
+                if(flowKey === ""){
+                    alert("流程定义key(flow_key)不能为空.");
+                    return;
+                }
+                if(flowName === ""){
+                    alert("流程名称(flow_name)不能为空.");
+                    return;
+                }
+                if(id===""){
+
+                    //新增
+                    $.ajax({
+                        url:  window.location.origin + contextPath + '/workFlow/insert',
+                        data: JSON.stringify({
+                            pageNum: 1,
+                            pageSize: 10,
+                            data: {
+                                flowKey: flowKey,
+                                flowName: flowName,
+                                remark: remark
+                            }
+                        }),
+                        type: 'post',
+                        contentType: 'application/json;charset=utf-8',
+                        dataType: "json",
+                        success: function (res) {
+                            if(res.success){
+                                alert("流程新增成功");
+                                window.location.href = contextPath + "/main.html?userId="+userId;
+                            }
+                        },
+                        error: function (result) {alert("流程新增失败，内部错误.");}
+                    });                    
+                }else{
+                    //修改
+                    $.ajax({
+                        url:  window.location.origin + contextPath + '/workFlow/update',
+                        data: JSON.stringify({
+                            pageNum: 1,
+                            pageSize: 10,
+                            data: {
+                                id: id,
+                                flowKey: flowKey,
+                                flowName: flowName,
+                                remark: remark
+                            }
+                        }),
+                        type: 'post',
+                        contentType: 'application/json;charset=utf-8',
+                        dataType: "json",
+                        success: function (res) {
+                            if(res.success){
+                                alert("流程修改成功");
+                                window.location.href = contextPath + "/main.html?userId="+userId;
+                            }
+                        },
+                        error: function (result) {alert("流程修改失败，内部错误.");}
+                    });  
+                }
+            }
+
+            //获取浏览器地址上的url参数
+            function getQueryVariable(variable){
+                var query = window.location.search.substring(1);
+                var vars = query.split("&");
+                for (var i=0;i<vars.length;i++) {
+                    var pair = vars[i].split("=");
+                    if(pair[0] == variable){return pair[1];}
+                }
+                return "";
+            }
+
+        </script>
+    </body>
+</html>

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh">
+    <head>
+        <meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>新增/修改流程节点配置</title>
+        <style>
+           div,th,td {
+                font-size: 12px;
+           }
+           td a {
+               margin: 0px 2px;
+           }
+        </style>
+    </head>
+    <body>
+        <div id="content">
+            <div id="currentUser" style="color:green;font-weight:bold;font-size:14px;"></div>
+            <div><a id="backTo" href='#'>返回</a></div>
+
+            <div>&nbsp;</div>
+            <div id="info">新增/修改流程节点配置</div>
+
+            <div>&nbsp;</div>
+            <div>
+                <form id="flowForm">
+                    ID: <span id="formNodeId"></span><br/>
+                    流程定义key(flow_key): <span id="flowKey"></span><br/>
+                    流程节点名称(node_name)<font color="red">*</font>: <input type="text" id="nodeName"><br>
+                    节点类型(node_type)<font color="red">*</font>: 
+                    <select id="nodeType" name="nodeType">
+                        <option value ="simple">简单节点(simple)</option>
+                        <option value ="togethersign">会签节点(togethersign)</option>
+                        <option value ="orsign">或签节点(orsign)</option>
+                    </select>
+                    会签节点(togethersign),或签节点(orsign)为控制用的节点，取这2个值时，处理人(handler)和处理人类型(handler_type)选为空即可。
+                    <br>
+                    父节点Id(parent_node_id)<font color="red">*</font>: <input type="text" id="parentNodeId">父节点Id(parent_node_id)为0为主流程上的节点<br>
+                    节点顺序(node_order)<font color="red">*</font>: <input type="text" id="nodeOrder">当父节点Id(parent_node_id)为0时，节点顺序特别重要，工作流程就是按父节点Id为0的这些节点的node_order数字从小到大进行流转<br>
+                    处理人(handler): <input type="text" id="handler"><span>节点类型为简单节点(simple) ,处理人需要有值。</span><br>
+                    处理人类型(handler_type): 
+                    <select id="handlerType" name="handlerType">
+                        <option value =""></option>
+                        <option value ="fixed">fixed固定</option>
+                        <option value ="fromForm">fromForm从表单选择</option>
+                        <option value ="mapTo">mapTo根据发起人计算出审批人</option>
+                    </select>
+                    <span>处理人类型，fixed固定，fromForm从表单选择，mapTo根据发起人计算出审批人,目前的程序只实现了fixed固定人员，可自行扩展.</span>
+                    <br>
+                    备注(remark): <input type="text" id="remark"><br>
+                    页面排序号(page_order): <input type="text" id="pageOrder">仅用于流程节点配置列表页面排序用，不会影响工作流程的流转。<br>
+                    <input type="button" onclick="addOrEdit();" value="保存">
+                </form>
+            </div>
+
+        </div>
+        <script src="js/config.js"></script>
+        <script src="js/jquery.min.js"></script>
+        <script type="text/javascript">
+            var contextPath = getContextPath();
+            var userId = getQueryVariable("userId");
+            var id = getQueryVariable("id");
+            var flowKey = getQueryVariable("flowKey");
+
+            //返回按钮
+            document.getElementById("backTo").href = contextPath + "/flowNodeList.html?userId="+userId+"&flowKey="+flowKey;
+
+            $(function() {
+                //模拟所有参与人员
+                //lix：普通人员
+                //zhaoyl：项目经理
+                //liujh,linjh,huangjc：部门经理
+                //xuw：总经理
+                let arr = ['lix', 'zhaoyl', 'liujh', 'linjh', 'huangjc', 'xuw'];
+                if(!arr.includes(userId)){
+                    alert("未合法的userId，请查看main.html里面的定义.");
+                    return;
+                }
+                //设置当前用户信息：
+                document.getElementById("currentUser").innerHTML = "你是："+userId;
+                document.getElementById("flowKey").innerText = flowKey;
+
+                //如果id不为空，则加载数据库中的数据进行填充表单
+                if(id!=""){
+                    $.ajax({
+                        url:  window.location.origin + contextPath + '/workFlowNodes/queryById',
+                        data: JSON.stringify({
+                            pageNum: 1,
+                            pageSize: 10,
+                            data: {
+                                id: Number(id),
+                            }
+                        }),
+                        type: 'post',
+                        contentType: 'application/json;charset=utf-8',
+                        dataType: "json",
+                        success: function (res) {
+                            if(res.success){
+                                var aRow = res.data;
+                                document.getElementById("formNodeId").innerText = aRow.id;
+                                document.getElementById("flowKey").innerText = aRow.flowKey;
+                                document.getElementById("nodeName").value = aRow.nodeName;
+                                set_select_checked("nodeType",aRow.nodeType);
+                                document.getElementById("parentNodeId").value = aRow.parentNodeId;
+                                document.getElementById("nodeOrder").value = aRow.nodeOrder;
+                                document.getElementById("handler").value = aRow.handler;
+                                set_select_checked("handlerType",aRow.handlerType);
+                                document.getElementById("remark").value = aRow.remark;
+                                document.getElementById("pageOrder").value = aRow.pageOrder;
+                            }
+                        },
+                        error: function (result) {alert("流程节点配置加载失败，内部错误.");}
+                    });   
+                }
+
+            });
+
+            //addOrEdit
+            function addOrEdit(){
+                var id = document.getElementById("formNodeId").innerText;
+                var flowKey = document.getElementById("flowKey").innerText;
+                var nodeName = document.getElementById("nodeName").value;
+               
+                //nodeType
+                var obj=document.getElementById('nodeType');
+                var index=obj.selectedIndex; //序号，取当前选中选项的序号
+                var nodeType = obj.options[index].value;
+
+                var parentNodeId = document.getElementById("parentNodeId").value;
+                var nodeOrder = document.getElementById("nodeOrder").value;
+                var handler = document.getElementById("handler").value;
+
+                //handlerType
+                var obj2=document.getElementById('handlerType');
+                var index2=obj2.selectedIndex; //序号，取当前选中选项的序号
+                var handlerType = obj2.options[index2].value;
+
+                var remark = document.getElementById("remark").value;
+                var pageOrder = document.getElementById("pageOrder").value;
+
+                if(flowKey === ""){
+                    alert("流程定义key(flow_key)不能为空.");
+                    return;
+                }
+                if(nodeName === ""){
+                    alert("nodeName不能为空.");
+                    return;
+                }
+                if(nodeType === ""){
+                    alert("nodeType不能为空.");
+                    return;
+                }
+                if(parentNodeId === ""){
+                    alert("parentNodeId不能为空.");
+                    return;
+                }
+                if(nodeOrder === ""){
+                    alert("nodeOrder不能为空.");
+                    return;
+                }
+                if(id===""){
+
+                    //新增
+                    $.ajax({
+                        url:  window.location.origin + contextPath + '/workFlowNodes/insert',
+                        data: JSON.stringify({
+                            pageNum: 1,
+                            pageSize: 10,
+                            data: {
+                                flowKey: flowKey,
+                                nodeName: nodeName,
+                                nodeType: nodeType,
+                                parentNodeId: parentNodeId,
+                                nodeOrder: nodeOrder,
+                                handler: handler,
+                                handlerType: handlerType,
+                                remark: remark,
+                                pageOrder: pageOrder
+                            }
+                        }),
+                        type: 'post',
+                        contentType: 'application/json;charset=utf-8',
+                        dataType: "json",
+                        success: function (res) {
+                            if(res.success){
+                                alert("流程节点配置新增成功");
+                                window.location.href = contextPath + "/flowNodeList.html?userId="+userId+"&flowKey="+flowKey;
+                            }
+                        },
+                        error: function (result) {alert("流程节点配置失败，内部错误.");}
+                    });                    
+                }else{
+                    //修改
+                    $.ajax({
+                        url:  window.location.origin + contextPath + '/workFlowNodes/update',
+                        data: JSON.stringify({
+                            pageNum: 1,
+                            pageSize: 10,
+                            data: {
+                                id: id,
+                                flowKey: flowKey,
+                                nodeName: nodeName,
+                                nodeType: nodeType,
+                                parentNodeId: parentNodeId,
+                                nodeOrder: nodeOrder,
+                                handler: handler,
+                                handlerType: handlerType,
+                                remark: remark,
+                                pageOrder: pageOrder
+                            }
+                        }),
+                        type: 'post',
+                        contentType: 'application/json;charset=utf-8',
+                        dataType: "json",
+                        success: function (res) {
+                            if(res.success){
+                                alert("流程节点配置修改成功");
+                                window.location.href = contextPath + "/flowNodeList.html?userId="+userId+"&flowKey="+flowKey;
+                            }
+                        },
+                        error: function (result) {alert("流程节点配置失败，内部错误.");}
+                    });  
+                }
+            }
+
+            //获取浏览器地址上的url参数
+            function getQueryVariable(variable){
+                var query = window.location.search.substring(1);
+                var vars = query.split("&");
+                for (var i=0;i<vars.length;i++) {
+                    var pair = vars[i].split("=");
+                    if(pair[0] == variable){return pair[1];}
+                }
+                return "";
+            }
+
+            //设置select选中
+            function set_select_checked(selectId, checkValue){
+                var select = document.getElementById(selectId);
+                for (var i = 0; i < select.options.length; i++){
+                    if (select.options[i].value == checkValue){
+                        select.options[i].selected = true;
+                        break;
+                    }
+                }
+            }
+
+        </script>
+    </body>
+</html>

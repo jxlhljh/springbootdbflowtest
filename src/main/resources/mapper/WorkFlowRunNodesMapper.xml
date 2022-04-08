@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.gzsendi.modules.workflow.mapper.WorkFlowRunNodesMapper">
+
+	<sql id="baseColumnList">
+		id,
+		order_id,
+		flow_node_id,
+		flow_key,
+		node_name,
+		node_type,
+		parent_node_id,
+		node_order,
+		node_status,
+		`handler`,
+		handler_type,
+		remark
+	</sql>
+
+	<select id="countWorkFlowRunNodes" resultType="java.lang.Integer">
+		select count(1) from work_flow_run_nodes where order_id = #{orderId} and flow_key = #{flowKey}
+	</select>
+	
+	<insert id="addWorkFlowRunNodes" parameterType="java.util.List" useGeneratedKeys="false">
+	    insert into work_flow_run_nodes(order_id,flow_node_id,flow_key,node_name,node_type,parent_node_id,node_order,node_status,handler,handler_type,remark) values
+	    <foreach collection="workFlowRunNodes" item="item" index="index" separator=",">
+	    	(#{item.orderId},#{item.flowNodeId},#{item.flowKey},#{item.nodeName},#{item.nodeType},#{item.parentNodeId},#{item.nodeOrder},#{item.nodeStatus},#{item.handler},#{item.handlerType},#{item.remark})
+	    </foreach>
+	</insert>
+	
+	<select id="queryWorkFlowRunNodes" resultType="workFlowRunNodes" resultSetType="FORWARD_ONLY" fetchSize="-2147483648">
+		select
+		<include refid="baseColumnList" />
+		from work_flow_run_nodes where`order_id` = #{orderId}
+	</select>
+	
+	<select id="queryWorkFlowRunNodesReadyHandler" resultType="workFlowRunNodes" resultSetType="FORWARD_ONLY" fetchSize="-2147483648">
+		select
+		<include refid="baseColumnList" />
+		from work_flow_run_nodes where`order_id` = #{orderId} and node_status = 'ready'
+	</select>
+	
+	<select id="getFirstMainRunNode" resultType="workFlowRunNodes" resultSetType="FORWARD_ONLY" fetchSize="-2147483648">
+		select
+		<include refid="baseColumnList" />
+		from work_flow_run_nodes where`order_id` = #{orderId} and parent_node_id = 0 order by node_order asc limit 1
+	</select>
+	
+	<select id="getChildRunNodes" resultType="workFlowRunNodes" resultSetType="FORWARD_ONLY" fetchSize="-2147483648">
+		select
+		<include refid="baseColumnList" />
+		from work_flow_run_nodes where`order_id` = #{orderId} and parent_node_id = #{flowNodeId}
+	</select>
+	
+	<update id="updateWorkFlowRunNodeNodeStatus" parameterType="workFlowRunNodes" >
+    	update work_flow_run_nodes set node_status = #{nodeStatus} where order_id = #{orderId} and flow_node_id = #{flowNodeId}
+  	</update>
+  	
+	<update id="updateAllNodeStatusFuture" parameterType="java.lang.String" >
+    	update work_flow_run_nodes set node_status = 'future' where order_id = #{orderId}
+  	</update>
+ 
+ 	<update id="deleteWorkFlowRunNodeNode" parameterType="java.lang.String" >
+    	delete from work_flow_run_nodes where order_id = #{orderId}
+  	</update> 	
+  	
+
+</mapper>

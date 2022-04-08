@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh">
+    <head>
+        <meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>启动流程</title>
+        <style>
+           div,th,td {
+                font-size: 12px;
+           }
+           td a {
+               margin: 0px 2px;
+           }
+        </style>
+    </head>
+    <body>
+        <div id="content">
+            <div id="currentUser" style="color:green;font-weight:bold;font-size:14px;"></div>
+            <div><a id="backTo" href='#'>返回</a></div>
+
+            <div>&nbsp;</div>
+            <div id="info">启动流程</div>
+
+            <div>&nbsp;</div>
+            <div>
+                <form id="flowInstanceForm">
+                    
+                </form>
+            </div>
+
+        </div>
+        <script src="js/config.js"></script>
+        <script src="js/jquery.min.js"></script>
+        <script type="text/javascript">
+            var contextPath = getContextPath();
+            var userId = getQueryVariable("userId");
+            var id = getQueryVariable("id");
+            var flowKey = getQueryVariable("flowKey");
+
+            //返回按钮
+            document.getElementById("backTo").href = contextPath + "/main.html?userId="+userId;
+
+            $(function() {
+                //模拟所有参与人员
+                //lix：普通人员
+                //zhaoyl：项目经理
+                //liujh,linjh,huangjc：部门经理
+                //xuw：总经理
+                let arr = ['lix', 'zhaoyl', 'liujh', 'linjh', 'huangjc', 'xuw'];
+                if(!arr.includes(userId)){
+                    alert("未合法的userId，请查看main.html里面的定义.");
+                    return;
+                }
+                //设置当前用户信息：
+                document.getElementById("currentUser").innerHTML = "你是："+userId;
+                //设置当前流程Key
+                document.getElementById("info").innerHTML = "启动流程<font color='red'>["+flowKey+"]</font>";
+
+                //动态构造Form表单的字段,根据flowKey查询出表单的字段列表，然后动态构造表单
+                $.ajax({
+                    url:  contextPath + "/workFlowFormField/list",
+                    data: JSON.stringify({
+                        pageNum: 1,
+                        pageSize: 10,
+                        data: {
+                            flowKey: flowKey
+                        }
+                    }),
+                    type: 'post',
+                    contentType: 'application/json;charset=utf-8',
+                    dataType: "json",
+                    success: function (res) {
+                        
+                        if(res.data.list.length >0){
+                            
+                            var htmlStr = "";
+                            var list = res.data.list;
+                            for(var i=0;i<list.length;i++){
+                                htmlStr += list[i].fieldCname+"-"+list[i].fieldName+':<input type="text" name="'+list[i].fieldName+'" id="'+list[i].fieldName+'"><br>';
+                            }
+
+                            htmlStr += '<input type="button" onclick="validateFormField();" value="提交申请（开启流程）">';
+                            document.getElementById("flowInstanceForm").innerHTML = htmlStr;
+                        }
+
+                    },
+                    error: function (result) {alert("加载流程动态表单字段配置失败，内部错误.");}
+                });
+
+            });
+
+            //validateFormField，表单字段较验
+            function validateFormField(){
+
+                //校验表单字段是不是填写完整
+                $.ajax({
+                    url:  contextPath + "/workFlowFormField/list",
+                    data: JSON.stringify({
+                        pageNum: 1,
+                        pageSize: 10,
+                        data: {
+                            flowKey: flowKey
+                        }
+                    }),
+                    type: 'post',
+                    contentType: 'application/json;charset=utf-8',
+                    dataType: "json",
+                    success: function (res) {
+                        
+                        //遍历所有的字段进行校验
+                        let validateSuccess = true;
+                        if(res.data.list.length >0){
+                            var list = res.data.list;
+                            var formJson = serializeToJson($("#flowInstanceForm").serialize());
+                            for(var i=0;i<list.length;i++){
+                                if(formJson[list[i].fieldName] === undefined){
+                                    alert(list[i].fieldCname+"-"+list[i].fieldName + " ,字段填写未完整！");
+                                    validateSuccess = false;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if(validateSuccess){
+                            startFlowInstance();
+                        }
+                    },
+                    error: function (result) {alert("加载流程动态表单字段配置失败，内部错误.");}
+                });
+
+            }
+
+            //开启一个新的流程
+            function startFlowInstance(){
+                //开启一个新流程
+                var formJson = serializeToJson($("#flowInstanceForm").serialize());
+                var params = {};
+                params.flowKey = flowKey;
+                params.userId = userId;
+                params.formJson = formJson;
+
+                //提交动态表单并开启新的流程
+                $.ajax({
+                    url:  contextPath + "/testFlow/addWorkOrderTest",
+                    data: JSON.stringify({
+                        pageNum: 1,
+                        pageSize: 10,
+                        data: params
+                    }),
+                    type: 'post',
+                    contentType: 'application/json;charset=utf-8',
+                    dataType: "json",
+                    success: function (res) {
+                        
+                        alert("开启流程成功.");
+                        //返回
+                        window.location.href = contextPath + "/main.html?userId="+userId;
+
+                    },
+                    error: function (result) {alert("开启流程失败，内部错误.");}
+                });
+            }
+
+            //获取浏览器地址上的url参数
+            function getQueryVariable(variable){
+                var query = window.location.search.substring(1);
+                var vars = query.split("&");
+                for (var i=0;i<vars.length;i++) {
+                    var pair = vars[i].split("=");
+                    if(pair[0] == variable){return pair[1];}
+                }
+                return "";
+            }
+
+            //参数并转换成对象Examples: &username=admin&age=19 -> {"username":"admin","age":19}
+            function serializeToJson(urlString){
+                const result = {} // 存参数得对象
+                // 利用正则表达式
+                urlString = "&" + urlString;
+                let reg = /[?&][^?&]+=[^?&]+/g;
+                const found = urlString.match(reg) ; //拿到有符合正则得字符串，输出为数组 [ '?name=home', '&age=20' ]
+                if(found){
+                    found.forEach(item => {
+                        let temp = item.substring(1).split('='); // = 分割
+                        let key = temp[0];
+                        let value = temp[1];
+                        result[key] = value
+                    })
+                }
+                return result;
+            }
+
+            //设置select选中
+            function set_select_checked(selectId, checkValue){
+                var select = document.getElementById(selectId);
+                for (var i = 0; i < select.options.length; i++){
+                    if (select.options[i].value == checkValue){
+                        select.options[i].selected = true;
+                        break;
+                    }
+                }
+            }
+
+        </script>
+    </body>
+</html>

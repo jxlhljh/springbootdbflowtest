@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.gzsendi.modules.workflow.mapper.WorkFlowNodesMapper">
+
+	<sql id="baseColumnList">
+		id,
+		`flow_key`,
+		`node_name`,
+		`node_type`,
+		`parent_node_id`,
+		`node_order`,
+		`handler`,
+		`handler_type`,
+		`remark`,
+		`page_order`
+	</sql>
+
+	<sql id="listSql">
+		select
+		<include refid="baseColumnList" />
+		from work_flow_nodes
+		<where>
+			<if test="flowKey != null">and `flow_key` = #{flowKey}</if>
+			<if test="nodeName != null">and `node_name` = #{nodeName}</if>
+			<if test="nodeType != null">and `node_type` = #{nodeType}</if>
+			<if test="parentNodeId != null">and `parent_node_id` = #{parentNodeId}</if>
+			<if test="nodeOrder != null">and `node_order` = #{nodeOrder}</if>
+			<if test="handler != null">and `handler` = #{handler}</if>
+			<if test="handlerType != null">and `handler_type` = #{handlerType}</if>
+			<if test="remark != null">and `remark` = #{remark}</if>
+		</where>
+	</sql>
+
+	<select id="list" parameterType="workFlowNodes" resultType="workFlowNodes" resultSetType="FORWARD_ONLY" fetchSize="-2147483648">
+		<include refid="listSql" />
+		order by page_order asc
+	</select>
+
+	<select id="export" parameterType="workFlowNodes" resultType="workFlowNodes" resultSetType="FORWARD_ONLY" fetchSize="-2147483648">
+		<include refid="listSql" />
+	</select>
+
+	<select id="queryById" resultType="workFlowNodes" parameterType="java.lang.Integer">
+		select
+		<include refid="baseColumnList" />
+		from work_flow_nodes
+		where id = #{id}
+	</select>
+	
+	<insert id="insert" parameterType="workFlowNodes">
+		insert into work_flow_nodes(`flow_key`,`node_name`,`node_type`,`parent_node_id`,`node_order`,`handler`,`handler_type`,`remark`,`page_order`) values(#{flowKey},#{nodeName},#{nodeType},#{parentNodeId},#{nodeOrder},#{handler},#{handlerType},#{remark},#{pageOrder})
+	</insert>
+	
+	<update id="update" parameterType="workFlowNodes" >
+    	update work_flow_nodes
+     	<trim prefix="set" suffixOverrides=",">
+			<if test="flowKey != null">`flow_key` = #{flowKey},</if>
+			<if test="nodeName != null">`node_name` = #{nodeName},</if>
+			<if test="nodeType != null">`node_type` = #{nodeType},</if>
+			<if test="parentNodeId != null">`parent_node_id` = #{parentNodeId},</if>
+			<if test="nodeOrder != null">`node_order` = #{nodeOrder},</if>
+			<if test="handler != null">`handler` = #{handler},</if>
+			<if test="handlerType != null">`handler_type` = #{handlerType},</if>
+			<if test="remark != null">`remark` = #{remark},</if>
+			<if test="pageOrder != null">`page_order` = #{pageOrder},</if>
+		 </trim>
+    	where id = #{id}
+  	</update>
+
+	<delete id="delete" parameterType="java.util.List">
+		delete from work_flow_nodes where 
+		id in
+	    <foreach collection="ids" index="index" item="item" open="(" separator="," close=")">#{item}</foreach>
+	</delete>
+	
+	<select id="queryWorkFlowNodes" resultType="workFlowNodes" resultSetType="FORWARD_ONLY" fetchSize="-2147483648">
+		select
+		<include refid="baseColumnList" />
+		from work_flow_nodes where`flow_key` = #{flowKey}
+	</select>
+
+</mapper>

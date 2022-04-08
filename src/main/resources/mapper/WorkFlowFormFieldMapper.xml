@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.gzsendi.modules.workflow.mapper.WorkFlowFormFieldMapper">
+
+	<sql id="baseColumnList">
+		id,
+		`flow_key`,
+		`field_name`,
+		`field_cname`,
+		`field_type`,
+		`field_order`
+	</sql>
+
+	<sql id="listSql">
+		select
+		<include refid="baseColumnList" />
+		from work_flow_form_field
+		<where>
+			<if test="flowKey != null">and `flow_key` = #{flowKey}</if>
+			<if test="fieldName != null">and `field_name` = #{fieldName}</if>
+			<if test="fieldCname != null">and `field_cname` = #{fieldCname}</if>
+			<if test="fieldType != null">and `field_type` = #{fieldType}</if>
+			<if test="fieldOrder != null">and `field_order` = #{fieldOrder}</if>
+		</where>
+	</sql>
+
+	<select id="list" parameterType="workFlowFormField" resultType="workFlowFormField" resultSetType="FORWARD_ONLY" fetchSize="-2147483648">
+		<include refid="listSql" />
+		order by field_order asc
+	</select>
+
+	<select id="export" parameterType="workFlowFormField" resultType="workFlowFormField" resultSetType="FORWARD_ONLY" fetchSize="-2147483648">
+		<include refid="listSql" />
+	</select>
+
+	<select id="queryById" resultType="workFlowFormField" parameterType="java.lang.Integer">
+		select
+		<include refid="baseColumnList" />
+		from work_flow_form_field
+		where id = #{id}
+	</select>
+	
+	<insert id="insert" parameterType="workFlowFormField">
+		insert into work_flow_form_field(`flow_key`,`field_name`,`field_cname`,`field_type`,`field_order`) values(#{flowKey},#{fieldName},#{fieldCname},#{fieldType},#{fieldOrder})
+	</insert>
+	
+	<update id="update" parameterType="workFlowFormField" >
+    	update work_flow_form_field
+     	<trim prefix="set" suffixOverrides=",">
+			<if test="flowKey != null">`flow_key` = #{flowKey},</if>
+			<if test="fieldName != null">`field_name` = #{fieldName},</if>
+			<if test="fieldCname != null">`field_cname` = #{fieldCname},</if>
+			<if test="fieldType != null">`field_type` = #{fieldType},</if>
+			<if test="fieldOrder != null">`field_order` = #{fieldOrder},</if>
+		 </trim>
+    	where id = #{id}
+  	</update>
+
+	<delete id="delete" parameterType="java.util.List">
+		delete from work_flow_form_field where 
+		id in
+	    <foreach collection="ids" index="index" item="item" open="(" separator="," close=")">#{item}</foreach>
+	</delete>
+
+</mapper>

@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh">
+    <head>
+        <meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>显示流程列表</title>
+        <style>
+           div,th,td {
+                font-size: 12px;
+           }
+           td a {
+               margin: 0px 2px;
+           }
+        </style>
+    </head>
+    <body>
+        <div id="content">
+
+            
+            <div>-----快速切换人员-----</div>
+            <div>
+                * 普通人员：<a href="./main.html?userId=lix">http://localhost:8080/flowtest/main.html?userId=lix</a><br>
+                * 项目经理：<a href="./main.html?userId=zhaoyl">http://localhost:8080/flowtest/main.html?userId=zhaoyl</a><br>
+                * 部门经理1：<a href="./main.html?userId=liujh">http://localhost:8080/flowtest/main.html?userId=liujh</a><br>
+                * 部门经理2：<a href="./main.html?userId=linjh">http://localhost:8080/flowtest/main.html?userId=linjh</a><br>
+                * 部门经理3：<a href="./main.html?userId=huangjc">http://localhost:8080/flowtest/main.html?userId=huangjc</a><br>
+                * 总经理：<a href="./main.html?userId=xuw">http://localhost:8080/flowtest/main.html?userId=xuw</a><br>
+            </div>
+
+            <div>&nbsp;</div>
+            <div id="currentUser" style="color:green;font-weight:bold;font-size:14px;"></div>
+
+            <div>&nbsp;</div>
+            <div id="flowListInfo">流程定义列表,<a href='./flowAddOrEdit.html?userId=lix'>增加流程</a></div>
+			<table border="1" id="flowlst">
+            </table>
+            
+            <div>&nbsp;</div>
+            <div>待我处理的</div>
+            <table border="1" id="myDealList">
+            </table>
+
+            <div>&nbsp;</div>
+            <div>我申请的但被打回需要重新修改提交的的工单列表（发起人因一些原因如未提交完资料或需要打回修改信息场景使用）</div>
+            <table border="1" id="myUpdateAndResubmitList">
+            </table>
+
+            <div>&nbsp;</div>
+            <div>我已处理的</div>
+            <table border="1" id="myExamAndApprove">
+            </table>
+
+            <div>&nbsp;</div>
+            <div>我已发起的</div>
+            <table border="1" id="myApplyList">
+            </table>
+
+            <div>&nbsp;</div>
+            <div>抄送给我的</div>
+            <table border="1" id="sendToMeList">
+            </table>
+
+            <div>&nbsp;</div>
+            <div>-----工单状态(order_status)	的说明-----</div>
+            <div>
+               WAIT_FOR_VERIFY("待审批", "1"),<br>
+               FINISHED("已归档", "3"),<br>
+               WAIT_FOR_UPDATE("待修改", "4"),<br>
+               INVALIDED("已作废", "5"),<br>
+               CANCELED("已撤单", "6"),<br>
+            </div>
+
+
+
+        </div>
+        <script src="js/config.js"></script>
+        <script src="js/jquery.min.js"></script>
+        <script type="text/javascript">
+            var contextPath = getContextPath();
+            var userId = getQueryVariable("userId");
+            $(function() {
+                //模拟所有参与人员
+                //lix：普通人员
+                //zhaoyl：项目经理
+                //liujh,linjh,huangjc：部门经理
+                //xuw：总经理
+                let arr = ['lix', 'zhaoyl', 'liujh', 'linjh', 'huangjc', 'xuw'];
+                if(!arr.includes(userId)){
+                    alert("未合法的userId，请查看main.html里面的定义.");
+                    return;
+                }
+                //设置当前用户信息：
+                document.getElementById("currentUser").innerHTML = "你是："+userId;
+
+                //1.加载流程定义列表
+                $.ajax({
+                    url:  window.location.origin + contextPath + '/workFlow/list',
+                    data: JSON.stringify({
+                        pageNum: 1,
+                        pageSize: 100,
+                        data: {}
+                    }),
+                    type: 'post',
+                    contentType: 'application/json;charset=utf-8',
+                    dataType: "json",
+                    success: function (res) {
+
+                        //其它角色就不开放流程维护的功能，避免测试乱串
+                        //发起流程只通过lix账号进行测试
+                        if(userId != "lix"){
+                            var htmlStr = "<tr>";
+                            htmlStr += "<th>说明</th>";
+                            htmlStr += "<td><span style='color:red;'>当前账号不是lix，要进行流程维护和发起流程测试请使用http://localhost:8080/flowtest/main.html?userId=lix</span>&nbsp;<a style='color:green;font-weight:bold;' href='./main.html?userId=lix'>点击快速切换</a></td>";
+                            htmlStr += "</tr>";
+                            document.getElementById("flowlst").innerHTML = htmlStr;
+                            document.getElementById("flowListInfo").innerHTML = "流程定义列表";
+                            return;
+                        }
+
+                        var htmlStr = "<tr>";
+                        htmlStr += "<th>ID</th>";
+                        htmlStr += "<th>流程定义key(flow_key)</th>";
+                        htmlStr += "<th>流程名称(flow_name)</th>";
+                        htmlStr += "<th>备注(remark)</th>";
+                        htmlStr += "<th>创建时间(create_time)</th>";
+                        htmlStr += "<th>更新时间(update_time)</th>";
+                        htmlStr += "<th>操作</th>";
+                        if(res.data.list.length >0){
+                            var list = res.data.list;
+                            for(var i=0;i<list.length;i++){
+                                htmlStr += "<tr>";
+                                htmlStr += "<td>"+list[i].id+"</td>";
+                                htmlStr += "<td>"+list[i].flowKey+"</td>";
+                                htmlStr += "<td>"+list[i].flowName+"</td>";
+                                htmlStr += "<td>"+list[i].remark+"</td>";
+                                htmlStr += "<td>"+list[i].createTime+"</td>";
+                                htmlStr += "<td>"+list[i].updateTime+"</td>";
+                                
+                                //按钮列表
+                                htmlStr += "<td>";
+                                htmlStr += "<a href='./flowStart.html?id="+list[i].id+"&userId="+userId+"&flowKey="+list[i].flowKey+"'>启动</a>";
+                                htmlStr += "<a href='./flowAddOrEdit.html?userId="+userId+"&id="+list[i].id+"'>编辑</a>";
+                                htmlStr += "<a href='#' onclick='deleteFlow("+list[i].id+")'>删除</a>";
+                                htmlStr += "<a href='./flowNodeList.html?userId="+userId+"&flowKey="+list[i].flowKey+"'>流程节点设计</a>";
+                                htmlStr += "<a href='./flowFormList.html?userId="+userId+"&flowKey="+list[i].flowKey+"'>流程表单设计</a>";
+                                htmlStr += "</td>";
+                                htmlStr += "</tr>";
+                            
+                            }
+                        }
+                        document.getElementById("flowlst").innerHTML = htmlStr;
+                    },
+                    error: function (result) {alert("加载流程定义列表失败，内部错误.");}
+                });
+
+
+                //2.加载待我处理的工单列表数据
+                $.ajax({
+                    url:  window.location.origin + contextPath + '/workOrder/listMyDeal',
+                    data: JSON.stringify({
+                        pageNum: 1,
+                        pageSize: 100,
+                        data: {
+                            userId: userId
+                        }
+                    }),
+                    type: 'post',
+                    contentType: 'application/json;charset=utf-8',
+                    dataType: "json",
+                    success: function (res) {
+
+                        var htmlStr = "<tr>";
+                        htmlStr += "<th>工单号(order_id)</th>";
+                        htmlStr += "<th>流程定义key(flow_key)</th>";
+                        htmlStr += "<th>申请人(用户ID)(applicant)</th>";
+                        htmlStr += "<th>申请时间(application_time)</th>";
+                        htmlStr += "<th>工单摘要(order_summary)</th>";
+                        htmlStr += "<th>工单状态(order_status)</th>";
+                        htmlStr += "<th>当前流程节点名称(current_node_name)</th>";
+                        htmlStr += "<th>操作</th>";
+                        if(res.data.list.length >0){
+                            var list = res.data.list;
+                            for(var i=0;i<list.length;i++){
+                                htmlStr += "<tr>";
+                                htmlStr += "<td>"+list[i].orderId+"</td>";
+                                htmlStr += "<td>"+list[i].flowKey+"</td>";
+                                htmlStr += "<td>"+list[i].applicant+"</td>";
+                                htmlStr += "<td>"+list[i].applicationTime+"</td>";
+                                htmlStr += "<td>"+list[i].orderSummary+"</td>";
+                                htmlStr += "<td>"+list[i].orderStatus+"</td>";
+                                htmlStr += "<td>"+list[i].currentNodeName+"</td>";
+                                //按钮列表
+                                htmlStr += "<td>";
+                                htmlStr += "<a href='./examAndApprove.html?userId="+userId+"&orderId="+list[i].orderId+"&flowKey="+list[i].flowKey+"&flowNodeId="+list[i].flowNodeId+"'>审批</a>";
+                                htmlStr += "</td>";
+                                htmlStr += "</tr>";
+                            }
+                        }
+                        document.getElementById("myDealList").innerHTML = htmlStr;
+                    },
+                    error: function (result) {alert("待我处理的工单列表数据失败，内部错误.");}
+                });
+
+                //3.我发起的工单列表数据
+                $.ajax({
+                    url:  window.location.origin + contextPath + '/workOrder/listMyApply',
+                    data: JSON.stringify({
+                        pageNum: 1,
+                        pageSize: 100,
+                        data: {
+                            userId: userId
+                        }
+                    }),
+                    type: 'post',
+                    contentType: 'application/json;charset=utf-8',
+                    dataType: "json",
+                    success: function (res) {
+                        var htmlStr = "<tr>";
+                        htmlStr += "<th>工单号(order_id)</th>";
+                        htmlStr += "<th>流程定义key(flow_key)</th>";
+                        htmlStr += "<th>申请人(用户ID)(applicant)</th>";
+                        htmlStr += "<th>申请时间(application_time)</th>";
+                        htmlStr += "<th>工单摘要(order_summary)</th>";
+                        htmlStr += "<th>工单状态(order_status)</th>";
+                        htmlStr += "<th>当前流程节点名称(current_node_name)</th>";
+                        htmlStr += "<th>操作</th>";
+                        if(res.data.list.length >0){
+                            var list = res.data.list;
+                            for(var i=0;i<list.length;i++){
+                                htmlStr += "<tr>";
+                                htmlStr += "<td>"+list[i].orderId+"</td>";
+                                htmlStr += "<td>"+list[i].flowKey+"</td>";
+                                htmlStr += "<td>"+list[i].applicant+"</td>";
+                                htmlStr += "<td>"+list[i].applicationTime+"</td>";
+                                htmlStr += "<td>"+list[i].orderSummary+"</td>";
+                                htmlStr += "<td>"+list[i].orderStatus+"</td>";
+                                htmlStr += "<td>"+list[i].currentNodeName+"</td>";
+
+                                //按钮列表(查看详情)
+                                htmlStr += "<td>";
+                                htmlStr += "<a href='./workOrderView.html?userId="+userId+"&orderId="+list[i].orderId+"&flowKey="+list[i].flowKey+"'>详情</a>";
+                                htmlStr += "</td>";
+                                htmlStr += "</tr>";
+                            }
+                        }
+                        document.getElementById("myApplyList").innerHTML = htmlStr;
+                    },
+                    error: function (result) {alert("加载我发起的工单列表数据失败，内部错误.");}
+                });
+
+                //4.myExamAndApprove我处理过的工单列表数据
+                $.ajax({
+                    url:  window.location.origin + contextPath + '/workOrder/listMyExamAndApprove',
+                    data: JSON.stringify({
+                        pageNum: 1,
+                        pageSize: 100,
+                        data: {
+                            userId: userId
+                        }
+                    }),
+                    type: 'post',
+                    contentType: 'application/json;charset=utf-8',
+                    dataType: "json",
+                    success: function (res) {
+                        var htmlStr = "<tr>";
+                        htmlStr += "<th>工单号(order_id)</th>";
+                        htmlStr += "<th>流程定义key(flow_key)</th>";
+                        htmlStr += "<th>申请人(用户ID)(applicant)</th>";
+                        htmlStr += "<th>申请时间(application_time)</th>";
+                        htmlStr += "<th>工单摘要(order_summary)</th>";
+                        htmlStr += "<th>工单状态(order_status)</th>";
+                        htmlStr += "<th>当前流程节点名称(current_node_name)</th>";
+                        htmlStr += "<th>操作</th>";
+                        if(res.data.list.length >0){
+                            var list = res.data.list;
+                            for(var i=0;i<list.length;i++){
+                                htmlStr += "<tr>";
+                                htmlStr += "<td>"+list[i].orderId+"</td>";
+                                htmlStr += "<td>"+list[i].flowKey+"</td>";
+                                htmlStr += "<td>"+list[i].applicant+"</td>";
+                                htmlStr += "<td>"+list[i].applicationTime+"</td>";
+                                htmlStr += "<td>"+list[i].orderSummary+"</td>";
+                                htmlStr += "<td>"+list[i].orderStatus+"</td>";
+                                htmlStr += "<td>"+list[i].currentNodeName+"</td>";
+                                //按钮列表(查看详情)
+                                htmlStr += "<td>";
+                                htmlStr += "<a href='./workOrderView.html?userId="+userId+"&orderId="+list[i].orderId+"&flowKey="+list[i].flowKey+"'>详情</a>";                                htmlStr += "</td>";
+                                htmlStr += "</tr>";
+                                htmlStr += "</tr>";
+                            }
+                        }
+                        document.getElementById("myExamAndApprove").innerHTML = htmlStr;
+                    },
+                    error: function (result) {alert("加载我处理过的工单列表数据失败，内部错误.");}
+                });
+
+                //5.我申请的但被打回需要重新修改提交的的工单列表
+                $.ajax({
+                    url:  window.location.origin + contextPath + '/workOrder/listMyUpdateAndReSumit',
+                    data: JSON.stringify({
+                        pageNum: 1,
+                        pageSize: 100,
+                        data: {
+                            applicant: userId
+                        }
+                    }),
+                    type: 'post',
+                    contentType: 'application/json;charset=utf-8',
+                    dataType: "json",
+                    success: function (res) {
+                        var htmlStr = "<tr>";
+                        htmlStr += "<th>工单号(order_id)</th>";
+                        htmlStr += "<th>流程定义key(flow_key)</th>";
+                        htmlStr += "<th>申请人(用户ID)(applicant)</th>";
+                        htmlStr += "<th>申请时间(application_time)</th>";
+                        htmlStr += "<th>工单摘要(order_summary)</th>";
+                        htmlStr += "<th>工单状态(order_status)</th>";
+                        htmlStr += "<th>当前流程节点名称(current_node_name)</th>";
+                        htmlStr += "<th>操作</th>";
+                        if(res.data.list.length >0){
+                            var list = res.data.list;
+                            for(var i=0;i<list.length;i++){
+                                htmlStr += "<tr>";
+                                htmlStr += "<td>"+list[i].orderId+"</td>";
+                                htmlStr += "<td>"+list[i].flowKey+"</td>";
+                                htmlStr += "<td>"+list[i].applicant+"</td>";
+                                htmlStr += "<td>"+list[i].applicationTime+"</td>";
+                                htmlStr += "<td>"+list[i].orderSummary+"</td>";
+                                htmlStr += "<td>"+list[i].orderStatus+"</td>";
+                                htmlStr += "<td>"+list[i].currentNodeName+"</td>";
+                                //按钮列表(查看详情)
+                                htmlStr += "<td>";
+                                htmlStr += "<a href='./modifyAndReSubmit.html?orderId="+list[i].orderId+"&userId="+userId+"&flowKey="+list[i].flowKey+"'>重新修改</a>";
+                                htmlStr += "</tr>";
+                                htmlStr += "</tr>";
+                            }
+                        }
+                        document.getElementById("myUpdateAndResubmitList").innerHTML = htmlStr;
+                    },
+                    error: function (result) {alert("加载我申请的但被打回需要重新修改提交的的工单列表数据失败，内部错误.");}
+                });
+
+            });
+
+            //删除流程定义
+            function deleteFlow(id){
+                if (window.confirm("确认删除?")) {
+                    //删除流程定义
+                    $.ajax({
+                        url:  contextPath + "/workFlow/delete",
+                        data: JSON.stringify({
+                            pageNum: 1,
+                            pageSize: 10,
+                            data: {
+                                ids: [id]
+                            }
+                        }),
+                        type: 'post',
+                        contentType: 'application/json;charset=utf-8',
+                        dataType: "json",
+                        success: function (res) {
+                            alert("成功流程定义");
+                            window.location.href = contextPath + "/main.html?userId="+userId;
+                        },
+                        error: function (result) {alert("删除流程定义失败，内部错误.");}
+                    });
+                }               
+            }
+
+            //获取浏览器地址上的url参数
+            function getQueryVariable(variable){
+                var query = window.location.search.substring(1);
+                var vars = query.split("&");
+                for (var i=0;i<vars.length;i++) {
+                    var pair = vars[i].split("=");
+                    if(pair[0] == variable){return pair[1];}
+                }
+                return "";
+            }
+
+        </script>
+    </body>
+</html>

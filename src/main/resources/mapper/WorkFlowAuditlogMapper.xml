@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.gzsendi.modules.workflow.mapper.WorkFlowAuditlogMapper">
+
+	<insert id="addWorkFlowAuditlog" parameterType="workFlowAuditlog">
+	    insert into work_flow_auditlog(order_id,`handler`,handler_name,`agree`,audit_info,audit_time) values (#{orderId},#{handler},#{handlerName},#{agree},#{auditInfo},#{auditTime})
+	</insert>
+	
+	<select id="listWorkFlowAuditlogByOrderId" parameterType="java.lang.String" resultType="workFlowAuditlog" resultSetType="FORWARD_ONLY" fetchSize="-2147483648">
+		select * from work_flow_auditlog where order_id = #{orderId} order by audit_time desc
+	</select>
+
+</mapper>

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.gzsendi.modules.workflow.mapper.WorkFlowMapper">
+
+	<sql id="baseColumnList">
+		id,
+		flow_key,
+		flow_name,
+		remark,
+		create_time,
+		update_time
+	</sql>
+
+	<sql id="listSql">
+		select
+		<include refid="baseColumnList" />
+		from work_flow
+		<where>
+			<if test="flowKey != null">and `flow_key` = #{flowKey}</if>
+		</where>
+	</sql>
+
+	<select id="list" parameterType="workFlow" resultType="workFlow" resultSetType="FORWARD_ONLY" fetchSize="-2147483648">
+		<include refid="listSql" />
+	</select>
+	
+	<select id="getById" resultType="workFlow" parameterType="java.lang.Integer">
+		select
+		<include refid="baseColumnList" />
+		from work_flow
+		where id = #{id}
+	</select>
+	
+    <insert id="insert" parameterType="workFlow" keyProperty="id" useGeneratedKeys="true">
+		insert into work_flow(flow_key,flow_name,remark)
+		values(#{flowKey},#{flowName},#{remark})
+	</insert>
+	
+	<update id="update" parameterType="workFlow" >
+    	update work_flow
+     	<trim prefix="set" suffixOverrides=",">
+			<if test="flowKey != null">flow_key = #{flowKey},</if>
+			<if test="flowName != null">flow_name = #{flowName},</if>
+			<if test="remark != null">remark = #{remark},</if>
+		 </trim>
+    	where id = #{id}
+  	</update>
+
+    <delete id="delete" parameterType="java.util.List">
+		delete from work_flow where 
+		id in
+	    <foreach collection="ids" index="index" item="item" open="(" separator="," close=")">#{item}</foreach>
+	</delete>
+
+</mapper>

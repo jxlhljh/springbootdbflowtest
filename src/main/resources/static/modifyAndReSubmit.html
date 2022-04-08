@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh">
+    <head>
+        <meta charset="utf-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>工单修改重新提交</title>
+        <style>
+           div,th,td {
+                font-size: 12px;
+           }
+           td a {
+               margin: 0px 2px;
+           }
+        </style>
+    </head>
+    <body>
+        <div id="content">
+            <div id="currentUser" style="color:green;font-weight:bold;font-size:14px;"></div>
+            <div><a id="backTo" href='#'>返回</a></div>
+            <div>&nbsp;</div>
+
+            <div id="info">工单审批</div>
+            <div>&nbsp;</div>
+
+            <div>-----以下为审批表单信息部分------</div>
+            <form id="flowInstanceForm">
+                
+            </form>
+
+            <div>&nbsp;</div>
+
+            <div>-----以下为审批历史部分------</div>
+            <div id="approveHistoryDiv">
+                <table border="1" id="approveHistory">
+                </table>
+            </div>
+
+            <div>&nbsp;</div>
+            <div>-----是否审批同意(agree)	的说明-----</div>
+            <div>
+                1, "通过，交给下一个人再审"),<br>
+                0, "通过，流程结束，直接归档"),<br>
+                998, "不通过，下一步修改申请"),<br>
+                999, "不通过，直接取消审批(撤单)")<br>
+            </div>
+
+            <div>&nbsp;</div>
+
+        </div>
+        <script src="js/config.js"></script>
+        <script src="js/jquery.min.js"></script>
+        <script type="text/javascript">
+            var contextPath = getContextPath();
+            var userId = getQueryVariable("userId");
+            var orderId = getQueryVariable("orderId");
+            var flowKey = getQueryVariable("flowKey");
+
+            //返回按钮
+            document.getElementById("backTo").href = contextPath + "/main.html?userId="+userId;
+
+            $(function() {
+                //模拟所有参与人员
+                //lix：普通人员
+                //zhaoyl：项目经理
+                //liujh,linjh,huangjc：部门经理
+                //xuw：总经理
+                let arr = ['lix', 'zhaoyl', 'liujh', 'linjh', 'huangjc', 'xuw'];
+                if(!arr.includes(userId)){
+                    alert("未合法的userId，请查看main.html里面的定义.");
+                    return;
+                }
+                //设置当前用户信息：
+                document.getElementById("currentUser").innerHTML = "你是："+userId;
+
+                //加载出工单记录信息
+                $.ajax({
+                    url:  contextPath + "/workOrder/queryByOrderId",
+                    data: JSON.stringify({
+                        pageNum: 1,
+                        pageSize: 10,
+                        data: {
+                            orderId: orderId
+                        }
+                    }),
+                    type: 'post',
+                    contentType: 'application/json;charset=utf-8',
+                    dataType: "json",
+                    success: function (res) {
+                        let formData = res.data.formData
+                        //同时加载出动态表单字段的数据
+                        setFormData(formData);
+                    },
+                    error: function (result) {alert("加载出工单记录信息失败，内部错误.");}
+                });
+
+
+                //4.加载载审批历史信息进行展示
+                $.ajax({
+                    url:  contextPath + "/workFlowAuditlog/listWorkFlowAuditlogByOrderId",
+                    data: JSON.stringify({
+                        pageNum: 1,
+                        pageSize: 10,
+                        data: {
+                            orderId: orderId
+                        }
+                    }),
+                    type: 'post',
+                    contentType: 'application/json;charset=utf-8',
+                    dataType: "json",
+                    success: function (res) {
+                        let formData = res.data
+                        var htmlStr = "<tr>";
+                        htmlStr += "<th>处理人(handler)</th>";
+                        htmlStr += "<th>审批时间(auditTime)</th>";
+                        htmlStr += "<th>是否审批同意(agree)</th>";
+                        htmlStr += "<th>审批意见(auditInfo)</th>";
+                        if(res.data.length >0){
+                            var list = res.data;
+                            for(var i=0;i<list.length;i++){
+                                htmlStr += "<tr>";
+                                htmlStr += "<td>"+list[i].handler+"</td>";
+                                htmlStr += "<td>"+list[i].auditTime+"</td>";
+                                htmlStr += "<td>"+list[i].agree+"</td>";
+                                htmlStr += "<td>"+list[i].auditInfo+"</td>";
+                                htmlStr += "</tr>";
+                            }
+                        }
+                        document.getElementById("approveHistory").innerHTML = htmlStr;
+                    },
+                    error: function (result) {alert("加载审批历史信息失败，内部错误.");}
+                });             
+
+            });
+
+            //setFormData,设置动态form的内容
+            function setFormData(formDataStr){
+                //加载出表单的动态字段，然后设置到html中
+                //动态构造Form表单的字段,根据flowKey查询出表单的字段列表，然后动态构造表单
+                var formData = JSON.parse(formDataStr);
+                $.ajax({
+                    url:  contextPath + "/workFlowFormField/list",
+                    data: JSON.stringify({
+                        pageNum: 1,
+                        pageSize: 10,
+                        data: {
+                            flowKey: getQueryVariable("flowKey")
+                        }
+                    }),
+                    type: 'post',
+                    contentType: 'application/json;charset=utf-8',
+                    dataType: "json",
+                    success: function (res) {
+                        if(res.data.list.length >0){
+                            var htmlStr = "";
+                            var list = res.data.list;
+                            for(var i=0;i<list.length;i++){
+                                htmlStr += list[i].fieldCname+"-"+list[i].fieldName+':<input type="text" value="'+formData[list[i].fieldName]+'" name="'+list[i].fieldName+'" id="'+list[i].fieldName+'"><br>';
+                            }
+                            htmlStr += '<input type="button" onclick="validateFormField();" value="重新提交">';
+                            document.getElementById("flowInstanceForm").innerHTML = htmlStr;
+                        }
+                    },
+                    error: function (result) {alert("加载流程动态表单字段配置失败，内部错误.");}
+                });
+
+            }
+
+            //validateFormField，表单字段较验
+            function validateFormField(){
+
+                //校验表单字段是不是填写完整
+                $.ajax({
+                    url:  contextPath + "/workFlowFormField/list",
+                    data: JSON.stringify({
+                        pageNum: 1,
+                        pageSize: 10,
+                        data: {
+                            flowKey: flowKey
+                        }
+                    }),
+                    type: 'post',
+                    contentType: 'application/json;charset=utf-8',
+                    dataType: "json",
+                    success: function (res) {
+                        
+                        //遍历所有的字段进行校验
+                        let validateSuccess = true;
+                        if(res.data.list.length >0){
+                            var list = res.data.list;
+                            var formJson = serializeToJson($("#flowInstanceForm").serialize());
+                            for(var i=0;i<list.length;i++){
+                                if(formJson[list[i].fieldName] === undefined){
+                                    alert(list[i].fieldCname+"-"+list[i].fieldName + " ,字段填写未完整！");
+                                    validateSuccess = false;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if(validateSuccess){
+                            updateAndReSumit();
+                        }
+                    },
+                    error: function (result) {alert("加载流程动态表单字段配置失败，内部错误.");}
+                });
+
+            }
+
+            //updateAndReSumit,重新提交流程
+            function updateAndReSumit(){
+                //updateAndReSumit,重新提交流程
+                var formJson = serializeToJson($("#flowInstanceForm").serialize());
+                var params = {};
+                params.orderId = orderId;
+                params.userId = userId;
+                params.formJson = formJson;
+                console.log(params);
+
+                //提交动态表单并开启新的流程
+                $.ajax({
+                    url:  contextPath + "/workOrder/updateAndReSumit",
+                    data: JSON.stringify({
+                        pageNum: 1,
+                        pageSize: 10,
+                        data: params
+                    }),
+                    type: 'post',
+                    contentType: 'application/json;charset=utf-8',
+                    dataType: "json",
+                    success: function (res) {
+                        
+                        alert("重新提交成功.");
+                        //返回
+                        window.location.href = contextPath + "/main.html?userId="+userId;
+
+                    },
+                    error: function (result) {alert("重新提交失败，内部错误.");}
+                });
+            }
+
+            //获取浏览器地址上的url参数
+            function getQueryVariable(variable){
+                var query = window.location.search.substring(1);
+                var vars = query.split("&");
+                for (var i=0;i<vars.length;i++) {
+                    var pair = vars[i].split("=");
+                    if(pair[0] == variable){return pair[1];}
+                }
+                return "";
+            }
+
+            //参数并转换成对象Examples: &username=admin&age=19 -> {"username":"admin","age":19}
+            function serializeToJson(urlString){
+                const result = {} // 存参数得对象
+                // 利用正则表达式
+                urlString = "&" + urlString;
+                let reg = /[?&][^?&]+=[^?&]+/g;
+                const found = urlString.match(reg) ; //拿到有符合正则得字符串，输出为数组 [ '?name=home', '&age=20' ]
+                if(found){
+                    found.forEach(item => {
+                        let temp = item.substring(1).split('='); // = 分割
+                        let key = temp[0];
+                        let value = temp[1];
+                        result[key] = value
+                    })
+                }
+                return result;
+            }
+
+            //设置select选中
+            function set_select_checked(selectId, checkValue){
+                var select = document.getElementById(selectId);
+                for (var i = 0; i < select.options.length; i++){
+                    if (select.options[i].value == checkValue){
+                        select.options[i].selected = true;
+                        break;
+                    }
+                }
+            }
+
+        </script>
+    </body>
+</html>
