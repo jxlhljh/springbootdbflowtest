@@ -11,7 +11,7 @@
  Target Server Version : 50731
  File Encoding         : 65001
 
- Date: 08/04/2022 12:00:48
+ Date: 09/04/2022 21:41:00
 */
 
 SET NAMES utf8mb4;
@@ -29,7 +29,7 @@ CREATE TABLE `work_flow`  (
   `create_time` datetime(0) NULL DEFAULT CURRENT_TIMESTAMP(0) COMMENT '创建时间',
   `update_time` datetime(0) NULL DEFAULT CURRENT_TIMESTAMP(0) ON UPDATE CURRENT_TIMESTAMP(0) COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 7 CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 8 CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of work_flow
@@ -37,6 +37,7 @@ CREATE TABLE `work_flow`  (
 INSERT INTO `work_flow` VALUES (1, 'exchange', '调休申请', '调休申请', '2022-04-02 21:48:03', '2022-04-02 21:48:10');
 INSERT INTO `work_flow` VALUES (4, 'billing', '开票申请', '开票申请', '2022-04-06 13:22:14', '2022-04-07 13:13:14');
 INSERT INTO `work_flow` VALUES (6, 'leave', '请假(或签)', '请假(或签)', '2022-04-07 22:18:38', '2022-04-07 22:18:38');
+INSERT INTO `work_flow` VALUES (7, 'selectAtFlowStart', '发起申请时选择审批人', '发起申请时选择审批人', '2022-04-09 11:53:43', '2022-04-09 12:00:43');
 
 -- ----------------------------
 -- Table structure for work_flow_auditlog
@@ -45,6 +46,7 @@ DROP TABLE IF EXISTS `work_flow_auditlog`;
 CREATE TABLE `work_flow_auditlog`  (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `order_id` varchar(50) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL COMMENT '工单号',
+  `node_name` varchar(100) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '环节主流程节点名称',
   `handler` varchar(50) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL COMMENT '审批人用户名',
   `handler_name` varchar(50) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL COMMENT '审批人名称',
   `agree` varchar(50) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL COMMENT '是否审批通过，1通过,999不通过',
@@ -62,21 +64,25 @@ CREATE TABLE `work_flow_form_field`  (
   `flow_key` varchar(50) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL COMMENT '流程定义key',
   `field_name` varchar(100) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL COMMENT '字段名称',
   `field_cname` varchar(50) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '字段中文',
-  `field_type` varchar(50) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '字段类型',
+  `field_type` varchar(50) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '字段类型,text,select',
+  `default_value` varchar(50) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT '' COMMENT '默认值',
+  `other_info` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT '' COMMENT '补充信息，如下拉列表静态数据配置，其他信息等',
   `field_order` int(11) NULL DEFAULT NULL COMMENT '序号',
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 15 CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 17 CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of work_flow_form_field
 -- ----------------------------
-INSERT INTO `work_flow_form_field` VALUES (8, 'test1', 'fieldName2', '中文2', 'text', 1);
-INSERT INTO `work_flow_form_field` VALUES (9, 'exchange', 'dayStr', '调休天数', 'text', 3);
-INSERT INTO `work_flow_form_field` VALUES (10, 'billing', 'contractName', '合同名称', 'text', 1);
-INSERT INTO `work_flow_form_field` VALUES (11, 'billing', 'price', '开票金额', 'text', 2);
-INSERT INTO `work_flow_form_field` VALUES (12, 'exchange', 'dateStart', '调休开始时间', 'text', 2);
-INSERT INTO `work_flow_form_field` VALUES (13, 'exchange', 'reason', '调休原因', 'text', 4);
-INSERT INTO `work_flow_form_field` VALUES (14, 'leave', '请假天数', 'dayStr', 'text', 1);
+INSERT INTO `work_flow_form_field` VALUES (8, 'test1', 'fieldName2', '中文2', 'text', '', '', 1);
+INSERT INTO `work_flow_form_field` VALUES (9, 'exchange', 'dayStr', '调休天数', 'text', '', '', 3);
+INSERT INTO `work_flow_form_field` VALUES (10, 'billing', 'contractName', '合同名称', 'text', '', '', 1);
+INSERT INTO `work_flow_form_field` VALUES (11, 'billing', 'price', '开票金额', 'text', '', '', 2);
+INSERT INTO `work_flow_form_field` VALUES (12, 'exchange', 'dateStart', '调休开始时间', 'text', '', '', 2);
+INSERT INTO `work_flow_form_field` VALUES (13, 'exchange', 'reason', '调休原因', 'text', '', '', 4);
+INSERT INTO `work_flow_form_field` VALUES (14, 'leave', 'dayStr', '请假天数', 'text', '', '', 1);
+INSERT INTO `work_flow_form_field` VALUES (15, 'selectAtFlowStart', 'dayStr', 'dayStr', 'text', '1', '', 1);
+INSERT INTO `work_flow_form_field` VALUES (16, 'selectAtFlowStart', 'approveType', '请假类型', 'select', 'tiaoxu', '[{\"label\":\"病假\",\"value\":\"bingjia\"},{\"label\":\"事假\",\"value\":\"shijia\"},{\"label\":\"调休\",\"value\":\"tiaoxu\"}]', 2);
 
 -- ----------------------------
 -- Table structure for work_flow_nodes
@@ -94,7 +100,7 @@ CREATE TABLE `work_flow_nodes`  (
   `remark` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '备注',
   `page_order` int(11) NULL DEFAULT 0 COMMENT '页面排序号，用于页面显示排序',
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 16 CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 19 CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of work_flow_nodes
@@ -112,6 +118,9 @@ INSERT INTO `work_flow_nodes` VALUES (12, 'leave', '部门经理审批（或签�
 INSERT INTO `work_flow_nodes` VALUES (13, 'leave', '部门经理审批（或签）', 'simple', 12, 0, 'liujh', 'fixed', '部门经理审批（或签）', 3);
 INSERT INTO `work_flow_nodes` VALUES (14, 'leave', '部门经理审批（或签）', 'simple', 12, 0, 'huangjc', 'fixed', '部门经理审批（或签）', 6);
 INSERT INTO `work_flow_nodes` VALUES (15, 'leave', '部门经理审批（或签）', 'simple', 12, 0, 'linjh', 'fixed', '部门经理审批（或签）', 7);
+INSERT INTO `work_flow_nodes` VALUES (16, 'selectAtFlowStart', '项目经理审批', 'simple', 0, 1, '', 'fromForm', '', 1);
+INSERT INTO `work_flow_nodes` VALUES (17, 'selectAtFlowStart', '部门经理审批', 'simple', 0, 2, '', 'fromForm', '', 2);
+INSERT INTO `work_flow_nodes` VALUES (18, 'selectAtFlowStart', '总经理审批', 'simple', 0, 3, 'xuw', 'fixed', '', 3);
 
 -- ----------------------------
 -- Table structure for work_flow_run_handler
