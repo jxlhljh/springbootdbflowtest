@@ -16,6 +16,7 @@ public enum TaskResultEnum {
      */
     EXAM_AND_APPROVE_PASS_TO_NEXT(1, "通过，交给下一个人再审"),
     EXAM_AND_APPROVE_PASS_TO_END(0, "通过，流程结束，直接归档"),
+    EXAM_AND_APPROVE_REJECT_TO_PRE(997, "不通过，下一步打回到上一个环节"),
     EXAM_AND_APPROVE_REJECT_TO_MODIFICATION(998, "不通过，下一步修改申请"),
     EXAM_AND_APPROVE_REJECT_TO_CANCEL(999, "不通过，直接取消审批(撤单)")
     ;

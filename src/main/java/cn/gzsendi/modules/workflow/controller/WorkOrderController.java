@@ -2,6 +2,7 @@ package cn.gzsendi.modules.workflow.controller;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -18,6 +19,8 @@ import cn.gzsendi.modules.framework.model.RequestParams;
 import cn.gzsendi.modules.framework.model.Result;
 import cn.gzsendi.modules.framework.utils.JsonUtil;
 import cn.gzsendi.modules.workflow.model.WorkOrder;
+import cn.gzsendi.modules.workflow.model.dto.ApproveUserFormDto;
+import cn.gzsendi.modules.workflow.model.dto.ChangeApproveToOtherDto;
 import cn.gzsendi.modules.workflow.model.dto.MyDealWorkOrderDto;
 import cn.gzsendi.modules.workflow.model.dto.WorkOrderApproveDto;
 import cn.gzsendi.modules.workflow.model.dto.WorkOrderQueryDto;
@@ -66,11 +69,34 @@ public class WorkOrderController {
 	
 	//增加工单", httpMethod = HttpMethodContstans.POST)
 	@RequestMapping(value = "/addWorkOrder", method = RequestMethod.POST)
-	public Result<Object> addWorkOrder(@RequestBody RequestParams<WorkOrder> params) throws Exception {
+	public Result<Object> addWorkOrder(@RequestBody RequestParams<Map<String,Object>> params) throws Exception {
 		
-		iWorkOrderService.addWorkOrder(params.getData());
+		String jsonStr = URLDecoder.decode(JsonUtil.toJSONString(params.getData()),StandardCharsets.UTF_8.name());
+		Map<String,Object> dataParam = JsonUtil.castToObject(jsonStr);
+		String flowKey = JsonUtil.getString(dataParam, "flowKey");//流程Key
+		String userId = JsonUtil.getString(dataParam, "userId");//用户
+		String formJsonStr = JsonUtil.toJSONString(dataParam.get("formJson"));//动态表单数据
 		
-		return Result.ok();
+		Assert.notNull(flowKey, "flowKey is null.");
+		Assert.notNull(userId, "userId is null.");
+		Assert.notNull(formJsonStr, "formJsonStr is null.");
+		
+		//表单上传上来的审批人列表，以流程的flowNodeId为key,审批人用户账号为value,用于替换流程配置中的fromForm的值
+		List<ApproveUserFormDto> approveUserList =  JsonUtil.getList(dataParam, "approveUserList", ApproveUserFormDto.class);
+		Map<Integer,String> approveUserVariables = new HashMap<Integer, String>();
+		if(approveUserList.size()>0){
+			for(ApproveUserFormDto dto : approveUserList){
+				approveUserVariables.put(dto.getFlowNodeId(), dto.getUserId());
+			}
+		}
+		
+		String orderId = "GD"+System.currentTimeMillis();//用毫秒数模拟，正式环境改成工单ID生成服务调用，idGeneratorService.generateId(IdTypeEnum.USER_ID);
+		
+		//新加表单并启动流程
+		WorkOrder workOrder = iWorkOrderService.addWorkOrder(userId, orderId, flowKey, 1, "1", formJsonStr,approveUserVariables);
+		
+		return Result.ok(workOrder);
+		
 	}
 
 	//更新", httpMethod = HttpMethodContstans.POST)
@@ -94,6 +120,40 @@ public class WorkOrderController {
 		
 		return Result.ok();
 	}
+	
+	//工单转派给其他人员处理
+	//changeApproveToOther
+	//WorkFlowRunNodes的状态为ready是才可以转派
+	@RequestMapping(value = "/changeApproveToOther", method = RequestMethod.POST)
+	public Result<Object> changeApproveToOther(@RequestBody RequestParams<ChangeApproveToOtherDto> params) throws Exception {
+		
+		Assert.notNull(params.getData(), "data Parameter is null.");
+	
+		ChangeApproveToOtherDto dto = params.getData();
+
+		//进行转派处理
+		workFlowService.changeApproveToOther(dto);
+		
+		return Result.ok();
+		
+	}
+	
+	//工单取消转派
+	//changeApproveToOther
+	@RequestMapping(value = "/cancleChangeApproveToOther", method = RequestMethod.POST)
+	public Result<Object> cancleChangeApproveToOther(@RequestBody RequestParams<ChangeApproveToOtherDto> params) throws Exception {
+		
+		Assert.notNull(params.getData(), "data Parameter is null.");
+		ChangeApproveToOtherDto dto = params.getData();
+
+		//进行取消转派处理
+		workFlowService.cancleChangeApproveToOther(dto);
+		
+		return Result.ok();
+		
+	}
+	
+	
 	
 	//工单被打回后修改，然后重新修改提交时被调用
 	//updateAndReSumit

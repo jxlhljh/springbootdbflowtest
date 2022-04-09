@@ -3,7 +3,7 @@
 <mapper namespace="cn.gzsendi.modules.workflow.mapper.WorkFlowAuditlogMapper">
 
 	<insert id="addWorkFlowAuditlog" parameterType="workFlowAuditlog">
-	    insert into work_flow_auditlog(order_id,`handler`,handler_name,`agree`,audit_info,audit_time) values (#{orderId},#{handler},#{handlerName},#{agree},#{auditInfo},#{auditTime})
+	    insert into work_flow_auditlog(order_id,node_name,`handler`,handler_name,`agree`,audit_info,audit_time) values (#{orderId},#{nodeName},#{handler},#{handlerName},#{agree},#{auditInfo},#{auditTime})
 	</insert>
 	
 	<select id="listWorkFlowAuditlogByOrderId" parameterType="java.lang.String" resultType="workFlowAuditlog" resultSetType="FORWARD_ONLY" fetchSize="-2147483648">

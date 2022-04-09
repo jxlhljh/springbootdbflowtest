@@ -177,6 +177,7 @@
                         htmlStr += "<th>工单摘要(order_summary)</th>";
                         htmlStr += "<th>工单状态(order_status)</th>";
                         htmlStr += "<th>当前流程节点名称(current_node_name)</th>";
+                        htmlStr += "<th>转派备注(changeToOtherInfo)</th>";
                         htmlStr += "<th>操作</th>";
                         if(res.data.list.length >0){
                             var list = res.data.list;
@@ -189,9 +190,18 @@
                                 htmlStr += "<td>"+list[i].orderSummary+"</td>";
                                 htmlStr += "<td>"+list[i].orderStatus+"</td>";
                                 htmlStr += "<td>"+list[i].currentNodeName+"</td>";
+                                htmlStr += "<td>"+list[i].changeToOtherInfo+"</td>";
                                 //按钮列表
                                 htmlStr += "<td>";
                                 htmlStr += "<a href='./examAndApprove.html?userId="+userId+"&orderId="+list[i].orderId+"&flowKey="+list[i].flowKey+"&flowNodeId="+list[i].flowNodeId+"'>审批</a>";
+                                
+                                //转派按钮和取消转派按钮
+                                if(!list[i].changeToOtherInfo.indexOf("changeApproveToOther") == 0){
+                                    htmlStr += "<a href='./changeApproveToOther.html?userId="+userId+"&orderId="+list[i].orderId+"&flowKey="+list[i].flowKey+"&flowNodeId="+list[i].flowNodeId+"'>转派</a>";
+                                }else{
+                                    htmlStr += "<a href='#' onclick='cancleChangeApproveToOther(\""+list[i].orderId+"\",\""+list[i].flowNodeId+"\")'>取消转派</a>";
+                                }
+                                
                                 htmlStr += "</td>";
                                 htmlStr += "</tr>";
                             }
@@ -341,6 +351,33 @@
                 });
 
             });
+
+            //取消转派
+            function cancleChangeApproveToOther(orderId,flowNodeId){
+                
+                if (window.confirm("取消转派?")) {
+                    //取消转派
+                    $.ajax({
+                        url:  contextPath + "/workOrder/cancleChangeApproveToOther",
+                        data: JSON.stringify({
+                            pageNum: 1,
+                            pageSize: 10,
+                            data: {
+                                orderId: orderId,
+                                flowNodeId: Number(flowNodeId)
+                            }
+                        }),
+                        type: 'post',
+                        contentType: 'application/json;charset=utf-8',
+                        dataType: "json",
+                        success: function (res) {
+                            alert("成功取消转派");
+                            window.location.href = contextPath + "/main.html?userId="+userId;
+                        },
+                        error: function (result) {alert("取消转派失败，内部错误.");}
+                    });
+                } 
+            }
 
             //删除流程定义
             function deleteFlow(id){

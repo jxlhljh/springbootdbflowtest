@@ -1,6 +1,7 @@
 package cn.gzsendi.modules.workflow.service;
 
 import java.util.List;
+import java.util.Map;
 
 import cn.gzsendi.modules.framework.model.PageResult;
 import cn.gzsendi.modules.framework.model.RequestParams;
@@ -19,8 +20,12 @@ public interface IWorkOrderService {
 	/**根据orderId查询*/
 	public WorkOrder queryByOrderId(String orderId);
 	
-	/**新增*/
+	/**新增工单并启动流程*/
 	public int addWorkOrder(WorkOrder workOrder);
+	
+	/**新增工单并启动流程*/
+	//approveUserVariables);页面传上来的审批人列表
+	public WorkOrder addWorkOrder(String userId,String orderId,String flowKey,int subjectId,String subjectType,String formJsonStr,Map<Integer,String> approveUserVariables);
 	
 	/**修改*/
 	public int update(WorkOrder workOrder);

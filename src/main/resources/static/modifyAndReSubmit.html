@@ -110,6 +110,7 @@
                     success: function (res) {
                         let formData = res.data
                         var htmlStr = "<tr>";
+                        htmlStr += "<th>环节名称(nodeName)</th>";
                         htmlStr += "<th>处理人(handler)</th>";
                         htmlStr += "<th>审批时间(auditTime)</th>";
                         htmlStr += "<th>是否审批同意(agree)</th>";
@@ -118,6 +119,7 @@
                             var list = res.data;
                             for(var i=0;i<list.length;i++){
                                 htmlStr += "<tr>";
+                                htmlStr += "<td>"+list[i].nodeName+"</td>";
                                 htmlStr += "<td>"+list[i].handler+"</td>";
                                 htmlStr += "<td>"+list[i].auditTime+"</td>";
                                 htmlStr += "<td>"+list[i].agree+"</td>";

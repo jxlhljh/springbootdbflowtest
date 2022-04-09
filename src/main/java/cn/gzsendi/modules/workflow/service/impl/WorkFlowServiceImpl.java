@@ -10,6 +10,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.Assert;
 
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -17,6 +18,7 @@ import com.github.pagehelper.PageHelper;
 import cn.gzsendi.modules.framework.exception.GzsendiException;
 import cn.gzsendi.modules.framework.model.PageResult;
 import cn.gzsendi.modules.framework.model.RequestParams;
+import cn.gzsendi.modules.workflow.enums.HandlerTypeEnum;
 import cn.gzsendi.modules.workflow.enums.NodeStatusEnum;
 import cn.gzsendi.modules.workflow.enums.NodeTypeEnum;
 import cn.gzsendi.modules.workflow.enums.OrderStatusEnum;
@@ -34,6 +36,7 @@ import cn.gzsendi.modules.workflow.model.WorkFlowNodes;
 import cn.gzsendi.modules.workflow.model.WorkFlowRunHandler;
 import cn.gzsendi.modules.workflow.model.WorkFlowRunNodes;
 import cn.gzsendi.modules.workflow.model.WorkOrder;
+import cn.gzsendi.modules.workflow.model.dto.ChangeApproveToOtherDto;
 import cn.gzsendi.modules.workflow.service.IWorkFlowService;
 
 @Service
@@ -92,7 +95,10 @@ public class WorkFlowServiceImpl implements IWorkFlowService{
 
 	/**启动流程*/
 	@Transactional
-	public void startWorkFlow(String userId,String userName,String orderId,String flowKey){
+	public void startWorkFlow(String userId,String userName,String orderId,String flowKey,Map<Integer,String> approveUserVariables){
+		
+		//页面传上来的审批人参数，用于替换handlerType为fromForm类型的处理人
+		if(approveUserVariables ==null) approveUserVariables = new HashMap<Integer,String>();
 		
 		//0.work_flow_run_nodes表中如果有数据，说明此orderId已经启动了流程，直接抛异常
 		int runNodeLength = workFlowRunNodesMapper.countWorkFlowRunNodes(orderId, flowKey);
@@ -115,6 +121,7 @@ public class WorkFlowServiceImpl implements IWorkFlowService{
 			WorkFlowRunNodes workFlowRunNode = new WorkFlowRunNodes();
 			BeanUtils.copyProperties(woFlowNode, workFlowRunNode);//先复制共同的字段
 			workFlowRunNode.setId(null);//ID要清空
+			workFlowRunNode.setRemark("");//备注清空，只有转派了操作后此字段有值，如changeApproveToOther[huangjc] 
 			workFlowRunNode.setOrderId(orderId);
 			workFlowRunNode.setFlowNodeId(woFlowNode.getId());
 			//节点状态,先全部置为FUTURE
@@ -130,6 +137,13 @@ public class WorkFlowServiceImpl implements IWorkFlowService{
 						firstWorkFlowRunNode = workFlowRunNode;
 					}
 				}
+			}
+			
+			//处理从页面传上来的审批人数据，type为fromForm时需要从表单中获取审批人
+			if(workFlowRunNode.getHandlerType().equals(HandlerTypeEnum.FROMFORM.getValue())){
+				Integer flowNodeId = workFlowRunNode.getFlowNodeId();
+				if(approveUserVariables.get(flowNodeId) == null) throw new GzsendiException("审批人配置了需要从表单中选择，但未找到传到后台的审批人参数数据.");
+				workFlowRunNode.setHandler(approveUserVariables.get(flowNodeId) );//设置为表单上传过来的审批人
 			}
 			
 			//处理parentIdToNodes的数据
@@ -156,6 +170,7 @@ public class WorkFlowServiceImpl implements IWorkFlowService{
 		//4.插一条申请人提交审批的日志记录到work_flow_auditlog.
 		WorkFlowAuditlog woFlowAuditlog = new WorkFlowAuditlog();
 		woFlowAuditlog.setOrderId(orderId);
+		woFlowAuditlog.setNodeName("申请人");//审批环节名称,重新提交环节名称为空，为空也表不是申请人的环节
 		woFlowAuditlog.setHandler(userId);//当前用户账号
 		woFlowAuditlog.setHandlerName(userName);//当前用户账号名称
 		woFlowAuditlog.setAgree("1");//写死
@@ -198,6 +213,7 @@ public class WorkFlowServiceImpl implements IWorkFlowService{
 		//最后记录审批历史
     	//5.将审批记录记录加入work_flow_auditlog表
 		WorkFlowAuditlog woFlowAuditlog = new WorkFlowAuditlog();
+		woFlowAuditlog.setNodeName("申请人");//审批环节名称,重新提交环节名称为空，为空也表不是申请人的环节
 		woFlowAuditlog.setOrderId(orderId);
 		woFlowAuditlog.setHandler(userId);//当前用户账号
 		woFlowAuditlog.setHandlerName(userName);//当前用户账号名称
@@ -207,6 +223,104 @@ public class WorkFlowServiceImpl implements IWorkFlowService{
 		workFlowAuditlogMapper.addWorkFlowAuditlog(woFlowAuditlog);//
 		
     }
+	
+	/**将工单转换给其他人进行处理，本人也同时还能继续审批，代理人或本人审批完都算完成*/
+	/**
+	 * flowNodeId: 节点的Id
+	 * orderId:订单Id
+	 * otherUserId:转派的人的用户账号
+	 * 
+	 */
+	@Transactional
+	public void changeApproveToOther(ChangeApproveToOtherDto dto){
+		
+		if(dto.getFlowNodeId() == 0) throw new GzsendiException("flowNodeId Parameter is null.");
+		Assert.notNull(dto.getOrderId(), "orderId Parameter is null.");
+		Assert.notNull(dto.getOtherUserId(), "otherUserId Parameter is null.");
+		
+		//1.将数据库中的本节点查询出来先
+		WorkFlowRunNodes wRunNode = workFlowRunNodesMapper.queryWorkFlowRunNodeByFlowNodeId(dto.getOrderId(), dto.getFlowNodeId());
+		if(wRunNode == null) throw new GzsendiException("未找到运行中流程结点的数据，orderId:{}, flowNodeId: ", dto.getOrderId(),dto.getFlowNodeId());
+		if(!wRunNode.getNodeStatus().equals(NodeStatusEnum.READY.getValue())){
+			throw new GzsendiException("节点状态不是ready不能进行转派，orderId:{}, flowNodeId: ", dto.getOrderId(),dto.getFlowNodeId());
+		}
+		if(wRunNode.getRemark().startsWith("changeApproveToOther")){
+			throw new GzsendiException("节点已经是转派的，不允许进行第二次转派，可以收回转派出重新转派，当前转派信息:{} ", wRunNode.getRemark());
+		}
+		
+		//2.或签方式进行转派
+		//转换原理：构造一个新的或签结点，然后再构造一个转换人员的审批结点，将审批人和转派代理人节点挂载到这个或签结点下面。取消转换为逆操作
+		WorkFlowRunNodes orSignNode = new WorkFlowRunNodes();
+		BeanUtils.copyProperties(wRunNode, orSignNode);
+		WorkFlowRunNodes otherRunNode = new WorkFlowRunNodes();//转派人组成的节点
+		BeanUtils.copyProperties(wRunNode, otherRunNode);
+		orSignNode.setNodeStatus(NodeStatusEnum.WAITING.getValue());//复杂结点的waiting状态
+		orSignNode.setHandler("");//或签结点的审批人要置为空
+		orSignNode.setHandlerType("");//或签结点的审批人类型要置为空
+		orSignNode.setNodeType(NodeTypeEnum.ORSIGN.getValue());//或签
+		
+		//本结点的父结点修改为或签结点的ID
+		int nowSecond = (int)(System.currentTimeMillis()/1000);//获取到秒
+		wRunNode.setParentNodeId(orSignNode.getFlowNodeId());
+		wRunNode.setFlowNodeId(nowSecond);//人工构造一个flowNodeId,这里有点隐患，转派次数无限下去，可能会超int最大值，不过一般正常业务也不会多次转派，
+		wRunNode.setRemark("changeApproveToOther["+dto.getOtherUserId()+"]");//备流字段记录转派人员的信息
+		//转派人的父结点修改为或签结点的ID
+		otherRunNode.setParentNodeId(orSignNode.getFlowNodeId());
+		otherRunNode.setFlowNodeId(nowSecond + 1);//人工构造一个flowNodeId,这里有点隐患，转派次数无限下去，可能会超int最大值，不过一般正常业务也不会多次转派，
+		otherRunNode.setHandler(dto.getOtherUserId());//转换人员userId
+		
+		workFlowRunNodesMapper.updateWorkFlowRunNodes(orSignNode);//或签节点
+		List<WorkFlowRunNodes> workFlowRunNodes = new ArrayList<WorkFlowRunNodes>();
+		workFlowRunNodes.add(wRunNode);//本节点
+		workFlowRunNodes.add(otherRunNode);//转换人结点
+		workFlowRunNodesMapper.addWorkFlowRunNodes(workFlowRunNodes);
+		
+		//注意：转换不用写审批历史，因为不是审批
+		
+	}
+	
+	/**取消将工单转派*/
+	/**
+	 * flowNodeId: 节点的Id
+	 * orderId:订单Id
+	 */
+	@Transactional
+	public void cancleChangeApproveToOther(ChangeApproveToOtherDto dto){
+		
+		if(dto.getFlowNodeId() == 0) throw new GzsendiException("flowNodeId Parameter is null.");
+		Assert.notNull(dto.getOrderId(), "orderId Parameter is null.");
+		
+		//1.将数据库中的本节点查询出来先
+		WorkFlowRunNodes wRunNode = workFlowRunNodesMapper.queryWorkFlowRunNodeByFlowNodeId(dto.getOrderId(), dto.getFlowNodeId());
+		if(wRunNode == null) throw new GzsendiException("未找到运行中流程结点的数据，orderId:{}, flowNodeId: ", dto.getOrderId(),dto.getFlowNodeId());
+		if(!wRunNode.getNodeStatus().equals(NodeStatusEnum.READY.getValue())){
+			throw new GzsendiException("节点状态不是ready不能进行取消转派，orderId:{}, flowNodeId: ", dto.getOrderId(),dto.getFlowNodeId());
+		}
+		if(!wRunNode.getRemark().startsWith("changeApproveToOther")){
+			throw new GzsendiException("节点未转派过，不允许进行取消转派操作,orderId:{}, flowNodeId: ", dto.getOrderId(),dto.getFlowNodeId());
+		}
+		
+		//2.根据本节点找到父节点数据(转派时将普通审批结点更改成了orsign或签结点了)
+		WorkFlowRunNodes parentRunNode = workFlowRunNodesMapper.queryWorkFlowRunNodeByFlowNodeId(wRunNode.getOrderId(), wRunNode.getParentNodeId());
+		parentRunNode.setNodeStatus(NodeStatusEnum.READY.getValue());//复杂结点的waiting状态
+		parentRunNode.setHandler(wRunNode.getHandler());//或签结点的审批人要置为空
+		parentRunNode.setHandlerType(HandlerTypeEnum.FIXED.getValue());//审批人类型重新改回来fixed
+		parentRunNode.setNodeType(NodeTypeEnum.SIMPLE.getValue());//或签
+		parentRunNode.setRemark("");//备注清空
+		workFlowRunNodesMapper.updateWorkFlowRunNodes(parentRunNode);//或签节点
+		
+		//3.将parentRunNode节点下的所有子节点删除，（转派的反向操作）,递归删除
+		WorkFlowRunNodes query = new WorkFlowRunNodes();
+		query.setOrderId(parentRunNode.getOrderId());
+		query.setFlowNodeId(parentRunNode.getFlowNodeId());
+		List<WorkFlowRunNodes> childs = workFlowRunNodesMapper.getChildRunNodes(query);
+		if(childs != null){
+    		for(WorkFlowRunNodes aRunNode : childs) {
+    			deleteWorkFlowRunNodes(aRunNode);//调用递归删除子结点的方法
+    		}
+		}
+		
+	}
 	
 	/**审批流程，同意通过或拒绝不通过*/
 	/**
@@ -223,6 +337,15 @@ public class WorkFlowServiceImpl implements IWorkFlowService{
 		if(workFlowRunNodesList.size() == 0) {
 			throw new GzsendiException("未找到运行中流程结点的数据，orderId is {}", orderId);
 		}
+		
+		//1.1审批结果如果是打回上一环节，直接调用打回上一环节的方法
+		if(String.valueOf(TaskResultEnum.EXAM_AND_APPROVE_REJECT_TO_PRE.getResult()).equals(agree)){
+			backToPreRunNode(userId, userName, orderId, flowNodeId, comment);
+			return;
+		}
+		
+		//1.2审批结果如果是不通过直接结束流程，调用直接结束流程的处理方法
+		//TODO 待重构代码，目前以下代码也能正常使用，先不重构了。
 		
 		//遍历构造出从节点到父结点的hashMap以及从父结点找子结点的hashM
 		Map<Integer,WorkFlowRunNodes> flowNodeIdToParent = new HashMap<Integer,WorkFlowRunNodes>();//根据节点flowNodeId查找到父结点的map
@@ -377,7 +500,7 @@ public class WorkFlowServiceImpl implements IWorkFlowService{
 		woFlowAuditlog.setOrderId(orderId);
 		woFlowAuditlog.setHandler(userId);//当前用户账号
 		woFlowAuditlog.setHandlerName(userName);//当前用户账号名称
-		
+		woFlowAuditlog.setNodeName(workFlowRunNode.getNodeName());//记录当前处理人所在的环节名称
 		//不通过处理
 		if(String.valueOf(TaskResultEnum.EXAM_AND_APPROVE_REJECT_TO_CANCEL.getResult()).equals(agree)){
 			woFlowAuditlog.setAgree(String.valueOf(TaskResultEnum.EXAM_AND_APPROVE_REJECT_TO_CANCEL.getResult()));
@@ -445,6 +568,74 @@ public class WorkFlowServiceImpl implements IWorkFlowService{
     	
     }
 	
+    /**工单打回到上一个结点,节点为ready的状态才能进行打回操作*/
+    private void backToPreRunNode(String userId,String userName,String orderId,int flowNodeId,String comment){
+		
+		//1.先找到本结点
+		WorkFlowRunNodes wNode = workFlowRunNodesMapper.queryWorkFlowRunNodeByFlowNodeId(orderId, flowNodeId);
+		if(wNode == null) {
+			throw new GzsendiException("未找到运行中流程结点的数据，orderId is {}, flowNodeId: {}", orderId, flowNodeId);
+		}
+		
+		//2.递归查询父流点结点，直到查询到parentNodeId=0为止，此时找到了本结点所在的主流程的节点。
+		WorkFlowRunNodes rootNode = wNode;
+		while(rootNode.getParentNodeId() != 0){
+			rootNode = workFlowRunNodesMapper.queryWorkFlowRunNodeByFlowNodeId(orderId, rootNode.getParentNodeId());
+			if(rootNode == null) {
+				throw new GzsendiException("尝试找到运行中主流程结点的数据失败，orderId is {}, flowNodeId: {}", orderId, flowNodeId);
+			}
+		}
+		
+		//3.将本环节中所有的结点和子结点更新为future状态（因为要退回上一步，所有本环节的状态全变成future）
+		updateNodeStatusFutureToDb(rootNode);
+		
+		//4.尝试找本环节中的上一环节的主流程节点（parentNodeId为0）
+		WorkFlowRunNodes preMainRunNode = workFlowRunNodesMapper.getPreMainRunNode(rootNode);
+		//5.将上一环节的结点和子结点更新为waiting或ready状态
+		if(preMainRunNode != null){
+			updateNodeStatusReadyToDb(preMainRunNode);
+		}
+		
+    	//5.更新work_flow_run_handler表，记录审批人列表（去重，比如一个人当作了多个环节处理人，只记录一次，避免查询我处理的列表时出现重复）
+    	WorkFlowRunHandler wHandler = new WorkFlowRunHandler();
+    	wHandler.setOrderId(orderId);
+    	wHandler.setHandler(userId);
+    	wHandler.setHandlerName(userName);
+    	int handlerCount = workFlowRunHandlerMapper.countWorkFlowRunHandler(orderId, userId);
+    	if(handlerCount == 0){
+    		workFlowRunHandlerMapper.addWorkFlowRunHandler(wHandler);
+    	}
+		
+		//6.更新工单表状态
+		if(preMainRunNode == null){
+			//已经打回到申请人那里了,则将工单状态变为待修改
+			WorkOrder workOrder = new WorkOrder();
+			workOrder.setOrderId(orderId);
+			workOrder.setOrderStatus(OrderStatusEnum.WAIT_FOR_UPDATE.getValue());
+			workOrder.setCurrentNodeName("");//置空
+			workOrderMapper.updateCurrentNodeName(workOrder);
+		}else{
+			WorkOrder workOrder = new WorkOrder();
+			workOrder.setOrderId(orderId);
+			workOrder.setOrderStatus(OrderStatusEnum.WAIT_FOR_VERIFY.getValue());
+			workOrder.setCurrentNodeName(preMainRunNode.getNodeName());
+			workOrderMapper.updateCurrentNodeName(workOrder);
+		}
+		
+		//最后记录审批历史
+    	//7.将审批记录记录加入work_flow_auditlog表
+		WorkFlowAuditlog woFlowAuditlog = new WorkFlowAuditlog();
+		woFlowAuditlog.setOrderId(orderId);
+		woFlowAuditlog.setHandler(userId);//当前用户账号
+		woFlowAuditlog.setHandlerName(userName);//当前用户账号名称
+		woFlowAuditlog.setAgree(String.valueOf(TaskResultEnum.EXAM_AND_APPROVE_REJECT_TO_PRE.getResult()));
+		woFlowAuditlog.setAuditInfo(comment == null ? "退回到上一环节" : comment);
+		woFlowAuditlog.setAuditTime(new Date());//审批时间
+		woFlowAuditlog.setNodeName(wNode.getNodeName());//环节名称
+		workFlowAuditlogMapper.addWorkFlowAuditlog(woFlowAuditlog);//
+    	
+    }
+	
 	//打回修改时调用此方法，将所有运行节点的状态修改为future
 	private void updateAllNodeStatusFuture(String orderId){
 		workFlowRunNodesMapper.updateAllNodeStatusFuture(orderId);
@@ -467,6 +658,30 @@ public class WorkFlowServiceImpl implements IWorkFlowService{
 			
 		}
 	}
+	
+    //递归删除本节点及所有的子结点
+    private void deleteWorkFlowRunNodes(WorkFlowRunNodes rootNode){
+    	if(NodeTypeEnum.SIMPLE.getValue().equals(rootNode.getNodeType())){
+    		rootNode.setNodeStatus(NodeStatusEnum.READY.getValue());
+    		workFlowRunNodesMapper.deleteWorkFlowRunNodeByFlowNodeId(rootNode.getOrderId(), rootNode.getFlowNodeId());
+    	}else {
+    		
+    		//复杂结点，递归查询并更新状态
+    		rootNode.setNodeStatus(NodeStatusEnum.WAITING.getValue());
+    		workFlowRunNodesMapper.deleteWorkFlowRunNodeByFlowNodeId(rootNode.getOrderId(), rootNode.getFlowNodeId());
+    		
+    		WorkFlowRunNodes query = new WorkFlowRunNodes();
+    		query.setOrderId(rootNode.getOrderId());
+    		query.setFlowNodeId(rootNode.getFlowNodeId());
+    		List<WorkFlowRunNodes> childs = workFlowRunNodesMapper.getChildRunNodes(query);
+    		if(childs.size()>0){
+    			for(WorkFlowRunNodes aRunNode : childs) {
+    				deleteWorkFlowRunNodes(aRunNode);
+        		}
+    		}
+    		
+    	}
+    }
 	
     //递归更新所有的子结点都为Ready状态或wating状态
     private void updateNodeStatusReady(WorkFlowRunNodes aWorkFlowRunNode,Map<Integer,List<WorkFlowRunNodes>> flowNodeIdToChilds){
@@ -496,6 +711,30 @@ public class WorkFlowServiceImpl implements IWorkFlowService{
     		
     		//复杂结点，递归查询并更新状态
     		rootNode.setNodeStatus(NodeStatusEnum.WAITING.getValue());
+    		workFlowRunNodesMapper.updateWorkFlowRunNodeNodeStatus(rootNode);
+    		
+    		WorkFlowRunNodes query = new WorkFlowRunNodes();
+    		query.setOrderId(rootNode.getOrderId());
+    		query.setFlowNodeId(rootNode.getFlowNodeId());
+    		List<WorkFlowRunNodes> childs = workFlowRunNodesMapper.getChildRunNodes(query);
+    		if(childs.size()>0){
+    			for(WorkFlowRunNodes aRunNode : childs) {
+    				updateNodeStatusReadyToDb(aRunNode);
+        		}
+    		}
+    		
+    	}
+    }
+    
+    //递归更新所有的子结点都为futrue状态(直接查询库递归更新的方法)
+    private void updateNodeStatusFutureToDb(WorkFlowRunNodes rootNode){
+    	if(NodeTypeEnum.SIMPLE.getValue().equals(rootNode.getNodeType())){
+    		rootNode.setNodeStatus(NodeStatusEnum.FUTURE.getValue());
+    		workFlowRunNodesMapper.updateWorkFlowRunNodeNodeStatus(rootNode);
+    	}else {
+    		
+    		//复杂结点，递归查询并更新状态
+    		rootNode.setNodeStatus(NodeStatusEnum.FUTURE.getValue());
     		workFlowRunNodesMapper.updateWorkFlowRunNodeNodeStatus(rootNode);
     		
     		WorkFlowRunNodes query = new WorkFlowRunNodes();

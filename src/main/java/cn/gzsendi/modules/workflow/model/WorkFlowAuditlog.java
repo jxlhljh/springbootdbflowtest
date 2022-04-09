@@ -13,6 +13,9 @@ public class WorkFlowAuditlog implements Serializable{
 	
 	/**工单号*/
 	private String orderId;
+	
+	/**审批环节名称*/
+	private String nodeName;
 
 	/**处理人,处理人类型为固定时，此字段有值*/
 	private String handler;
@@ -84,6 +87,15 @@ public class WorkFlowAuditlog implements Serializable{
 
 	public void setAuditTime(Date auditTime) {
 		this.auditTime = auditTime;
+	}
+
+
+	public String getNodeName() {
+		return nodeName;
+	}
+
+	public void setNodeName(String nodeName) {
+		this.nodeName = nodeName;
 	}
 	
 }

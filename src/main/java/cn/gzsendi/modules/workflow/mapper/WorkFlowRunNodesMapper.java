@@ -23,6 +23,18 @@ public interface WorkFlowRunNodesMapper {
 	/**根据orderId和flowNodeId进行更新nodeStatus*/
 	public void updateWorkFlowRunNodeNodeStatus(WorkFlowRunNodes workFlowRunNode);
 	
+	/**根据id更新WorkFlowRunNodes*/
+	public void updateWorkFlowRunNodes(WorkFlowRunNodes workFlowRunNode);
+	
+	/**根据orderId和flowNodeId查询本流程结点*/
+	public WorkFlowRunNodes queryWorkFlowRunNodeByFlowNodeId(@Param("orderId") String orderId, @Param("flowNodeId") int flowNodeId);
+	
+	/**根据orderId和parentNodeId查询父流程结点*/
+	public WorkFlowRunNodes queryWorkFlowRunNodeByParentNodeId(@Param("orderId") String orderId, @Param("parentNodeId") int parentNodeId);
+
+	/**根据orderId和parentNodeId查询出本流程结点并删除掉*/
+	public void deleteWorkFlowRunNodeByFlowNodeId(@Param("orderId") String orderId, @Param("flowNodeId") int flowNodeId);
+	
 	/**根据orderId进行更新nodeStatus为future,审批被打回重新修改时被调用*/
 	public void updateAllNodeStatusFuture(@Param("orderId") String orderId);
 	
@@ -31,6 +43,9 @@ public interface WorkFlowRunNodesMapper {
 	
 	/**根据orderId获取首环节的主流程结点记录*/
 	public List<WorkFlowRunNodes> getFirstMainRunNode(WorkFlowRunNodes workFlowRunNode);
+	
+	/**根据orderId和nodeOrder进行查询上一个主流程节点*/
+	public WorkFlowRunNodes getPreMainRunNode(WorkFlowRunNodes workFlowRunNode);
 	
 	/**根据orderId获取首环节的流程结点下的子节点记录*/
 	public List<WorkFlowRunNodes> getChildRunNodes(WorkFlowRunNodes workFlowRunNode);

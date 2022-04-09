@@ -34,6 +34,11 @@
                         <option value ="select">下拉列表</option>
                     </select>
                     <br>
+                    默认值(default_value): <input type="text" id="defaultValue">默认值，文本框时直接就是配置的值，下拉框时，会对应的对此default_value进行选中.<br>
+                    <br>
+                    其他信息(other_info):<input style="width: 800px" type="text" id="otherInfo"><br>
+                    如字段类型(field_type)为select时的一些附加配置：示例：[{"label":"病假","value":"bingjia"},{"label":"事假","value":"shijia"},{"label":"调休","value":"tiaoxu"}]<br>
+                    <br>
                     序号(field_order)<font color="red">*</font>: <input type="text" id="fieldOrder"><br>
                     <input type="button" onclick="addOrEdit();" value="保存">
                     
@@ -90,6 +95,8 @@
                                 document.getElementById("fieldCname").value = aRow.fieldCname;
                                 //document.getElementById("fieldType").value = aRow.fieldType;
                                 set_select_checked("fieldType",aRow.fieldType);
+                                document.getElementById("defaultValue").value = aRow.defaultValue;
+                                document.getElementById("otherInfo").value = aRow.otherInfo;
                                 document.getElementById("fieldOrder").value = aRow.fieldOrder;
                             }
                         },
@@ -110,7 +117,8 @@
                 var obj=document.getElementById('fieldType');
                 var index=obj.selectedIndex; //序号，取当前选中选项的序号
                 var fieldType = obj.options[index].value;
-
+                var defaultValue = document.getElementById("defaultValue").value;
+                var otherInfo = document.getElementById("otherInfo").value;
                 var fieldOrder = document.getElementById("fieldOrder").value;
 
                 if(flowKey === ""){
@@ -146,6 +154,8 @@
                                 fieldName: fieldName,
                                 fieldCname: fieldCname,
                                 fieldType: fieldType,
+                                defaultValue: defaultValue,
+                                otherInfo: otherInfo,
                                 fieldOrder: fieldOrder
                             }
                         }),
@@ -173,6 +183,8 @@
                                 fieldName: fieldName,
                                 fieldCname: fieldCname,
                                 fieldType: fieldType,
+                                defaultValue: defaultValue,
+                                otherInfo: otherInfo,
                                 fieldOrder: fieldOrder
                             }
                         }),

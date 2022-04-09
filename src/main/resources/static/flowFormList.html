@@ -71,6 +71,8 @@
                         htmlStr += "<th>字段名称(field_name)</th>";
                         htmlStr += "<th>字段中文(field_cname)</th>";
                         htmlStr += "<th>字段类型(field_type)</th>";
+                        htmlStr += "<th>默认值(default_value)</th>";
+                        htmlStr += "<th>其他信息(other_info)</th>";
                         htmlStr += "<th>序号(field_order)</th>";
                         htmlStr += "<th>操作</th>";
 
@@ -83,6 +85,8 @@
                                 htmlStr += "<td>"+list[i].fieldName+"</td>";
                                 htmlStr += "<td>"+list[i].fieldCname+"</td>";
                                 htmlStr += "<td>"+list[i].fieldType+"</td>";
+                                htmlStr += "<td>"+list[i].defaultValue+"</td>";
+                                htmlStr += "<td>"+list[i].otherInfo+"</td>";
                                 htmlStr += "<td>"+list[i].fieldOrder+"</td>";
                                 
                                 //按钮列表

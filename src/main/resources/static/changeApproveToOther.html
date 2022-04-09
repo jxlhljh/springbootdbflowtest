@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8" />
 		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
-        <title>工单审批</title>
+        <title>工单转派</title>
         <style>
            div,th,td {
                 font-size: 12px;
@@ -19,7 +19,7 @@
             <div><a id="backTo" href='#'>返回</a></div>
             <div>&nbsp;</div>
 
-            <div id="info">工单审批</div>
+            <div id="info">工单转派</div>
             <div>&nbsp;</div>
 
             <div>-----以下为审批表单信息部分------</div>
@@ -36,19 +36,19 @@
             </div>
 
             <div>&nbsp;</div>
-            <div>-----工单当前处理人情况------</div>
-            <div id="approveNowDiv">
-                <table border="1" id="approveNow">
-                </table>
-            </div>
-
-            <div>&nbsp;</div>
-            <div>-----是否审批同意(agree)	的说明-----</div>
+            <div>-----转派选项------</div>
             <div>
-                1, "通过，交给下一个人再审"),<br>
-                0, "通过，流程结束，直接归档"),<br>
-                998, "不通过，下一步修改申请"),<br>
-                999, "不通过，直接取消审批(撤单)")<br>
+                将此工单转派给他人处理<font color="red">*</font>: 
+                <select id="otherUserId" name="otherUserId" onchange="changeAgree()">
+                    <option value ="xuw">总经理（xuw）</option>
+                    <option value ="liujh">部门经理（liujh）</option>
+                    <option value ="linjh">部门经理（linjh）</option>
+                    <option value ="huangjc">部门经理（huangjc）</option>
+                    <option value ="zhaoyl">项目经理（zhaoyl）</option>
+                    <option value ="lix">申请人员（lix）</option>
+                </select>
+                <br/>
+                <input type="button" onclick="changeApproveToOther();" value="确认转派给他人">  
             </div>
 
         </div>
@@ -136,47 +136,48 @@
                         document.getElementById("approveHistory").innerHTML = htmlStr;
                     },
                     error: function (result) {alert("加载审批历史信息失败，内部错误.");}
-                });
-
-                //5.加载出工单当前处理人情况
-                $.ajax({
-                    url:  contextPath + "/WorkFlowRunNodes/queryWorkFlowRunNodesReadyHandler",
-                    data: JSON.stringify({
-                        pageNum: 1,
-                        pageSize: 10,
-                        data: {
-                            orderId: orderId
-                        }
-                    }),
-                    type: 'post',
-                    contentType: 'application/json;charset=utf-8',
-                    dataType: "json",
-                    success: function (res) {
-                        let formData = res.data
-                        var htmlStr = "<tr>";
-                        
-                        htmlStr += "<th>工单号(order_id)</th>";
-                        htmlStr += "<th>流程节点名称(node_name)</th>";
-                        htmlStr += "<th>流程节点Id(flow_node_id)</th>";
-                        htmlStr += "<th>处理人(handler)</th>";
-
-                        if(res.data.length >0){
-                            var list = res.data;
-                            for(var i=0;i<list.length;i++){
-                                htmlStr += "<tr>";
-                                htmlStr += "<td>"+list[i].orderId+"</td>"
-                                htmlStr += "<td>"+list[i].nodeName+"</td>"
-                                htmlStr += "<td>"+list[i].flowNodeId+"</td>";
-                                htmlStr += "<td>"+list[i].handler+"</td>";
-                                htmlStr += "</tr>";
-                            }
-                        }
-                        document.getElementById("approveNow").innerHTML = htmlStr;
-                    },
-                    error: function (result) {alert("加载工单当前处理人情况失败，内部错误.");}
-                });
+                });             
 
             });
+
+            //changeApproveToOther,工单转派给其他人员处理
+            function changeApproveToOther(){
+                //所有参数列表数据获取
+                var userId = getQueryVariable("userId");
+                var orderId = getQueryVariable("orderId");
+                var flowNodeId = getQueryVariable("flowNodeId");//
+                
+                //otherUserId下拉框值获取
+                var obj=document.getElementById('otherUserId');
+                var index=obj.selectedIndex; //序号，取当前选中选项的序号
+                var otherUserId = obj.options[index].value;
+
+                var params = {};
+                params.userId = userId;
+                params.orderId = orderId;
+                params.flowNodeId = flowNodeId;
+                params.otherUserId = otherUserId;
+
+                if (window.confirm("确认转派给其他人员?")) {
+                    $.ajax({
+                        url:  contextPath + "/workOrder/changeApproveToOther",
+                        data: JSON.stringify({
+                            pageNum: 1,
+                            pageSize: 10,
+                            data: params
+                        }),
+                        type: 'post',
+                        contentType: 'application/json;charset=utf-8',
+                        dataType: "json",
+                        success: function (res) {
+                            alert("转派给其他人员成功.")
+                            window.location.href = contextPath + "/main.html?userId="+userId;
+                        },
+                        error: function (result) {alert("转派给其他人员失败，内部错误.");}
+                    });
+                } 
+
+            }
 
             //setFormData,设置动态form的内容
             function setFormData(formDataStr){

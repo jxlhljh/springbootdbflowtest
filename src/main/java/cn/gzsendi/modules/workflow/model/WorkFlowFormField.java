@@ -28,8 +28,30 @@ public class WorkFlowFormField implements Serializable{
 	//"字段类型")
 	private java.lang.String fieldType;
 	
+	//默认值
+	private String defaultValue;
+	
+	//其他信息内容
+	private String otherInfo;
+	
 	//"序号")
 	private java.lang.Integer fieldOrder;
+
+	public String getDefaultValue() {
+		return defaultValue;
+	}
+
+	public void setDefaultValue(String defaultValue) {
+		this.defaultValue = defaultValue;
+	}
+
+	public String getOtherInfo() {
+		return otherInfo;
+	}
+
+	public void setOtherInfo(String otherInfo) {
+		this.otherInfo = otherInfo;
+	}
 
 	public java.lang.Integer getId() {
 		return id;

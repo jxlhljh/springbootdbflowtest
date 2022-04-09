@@ -40,6 +40,7 @@
             <div>
                 1, "通过，交给下一个人再审"),<br>
                 0, "通过，流程结束，直接归档"),<br>
+                997, "不通过，退回上一环节"),<br>
                 998, "不通过，下一步修改申请"),<br>
                 999, "不通过，直接取消审批(撤单)")<br>
             </div>
@@ -53,6 +54,7 @@
                     <option value ="1">通过(同意)</option>
                     <option value ="999">不通过，直接取消审批(撤单)</option>
                     <option value ="998">不通过，下一步修改申请</option>
+                    <option value ="997">不通过，退回上一环节</option>
                 </select>
                 <br/>
 
@@ -125,6 +127,7 @@
                     success: function (res) {
                         let formData = res.data
                         var htmlStr = "<tr>";
+                        htmlStr += "<th>环节名称(nodeName)</th>";
                         htmlStr += "<th>处理人(handler)</th>";
                         htmlStr += "<th>审批时间(auditTime)</th>";
                         htmlStr += "<th>是否审批同意(agree)</th>";
@@ -133,6 +136,7 @@
                             var list = res.data;
                             for(var i=0;i<list.length;i++){
                                 htmlStr += "<tr>";
+                                htmlStr += "<td>"+list[i].nodeName+"</td>";
                                 htmlStr += "<td>"+list[i].handler+"</td>";
                                 htmlStr += "<td>"+list[i].auditTime+"</td>";
                                 htmlStr += "<td>"+list[i].agree+"</td>";
@@ -157,6 +161,8 @@
                     document.getElementById('remark').value = "不同意";
                 }else if(agree === "998"){
                     document.getElementById('remark').value = "请重新修改";
+                }else if(agree === "997"){
+                    document.getElementById('remark').value = "退回上一环节";
                 }else{
                     document.getElementById('remark').value = "同意";
                 }

@@ -28,6 +28,17 @@
                 </form>
             </div>
 
+            <div>&nbsp;</div>
+            <div>根据处理人类型选择流程审批人,，fixed固定，fromForm从表单选择，mapTo根据发起人计算出审批人</div>
+			<table border="1" id="handlerList">
+            </table>
+
+            <div>&nbsp;</div>
+            <div>
+                <input type="button" onclick="validateFormField();" value="提交申请（开启流程）">
+            </div>
+
+
         </div>
         <script src="js/config.js"></script>
         <script src="js/jquery.min.js"></script>
@@ -56,7 +67,7 @@
                 //设置当前流程Key
                 document.getElementById("info").innerHTML = "启动流程<font color='red'>["+flowKey+"]</font>";
 
-                //动态构造Form表单的字段,根据flowKey查询出表单的字段列表，然后动态构造表单
+                //1.动态构造Form表单的字段,根据flowKey查询出表单的字段列表，然后动态构造表单
                 $.ajax({
                     url:  contextPath + "/workFlowFormField/list",
                     data: JSON.stringify({
@@ -76,16 +87,93 @@
                             var htmlStr = "";
                             var list = res.data.list;
                             for(var i=0;i<list.length;i++){
-                                htmlStr += list[i].fieldCname+"-"+list[i].fieldName+':<input type="text" name="'+list[i].fieldName+'" id="'+list[i].fieldName+'"><br>';
+                                //文本框类型展示处理
+                                if(list[i].fieldType === "text"){
+                                    htmlStr += list[i].fieldCname+"-"+list[i].fieldName+':<input value="'+list[i].defaultValue+'" type="text" name="'+list[i].fieldName+'" id="'+list[i].fieldName+'"><br>';
+                                }else if(list[i].fieldType === "select"){
+                                    //下拉选择框处理
+                                    htmlStr += list[i].fieldCname+"-"+list[i].fieldName+':';
+                                    
+                                    htmlStr += '<select name="'+list[i].fieldName+'">';
+                                    //遍历下拉列表选项
+                                    var otherInfoArray = JSON.parse(list[i].otherInfo);
+                                    otherInfoArray.map(function(item,index) {
+                                        var selectedStr = item.value === list[i].defaultValue ? "selected" :"";
+                                        htmlStr += '<option '+selectedStr+' value ="'+item.value+'">'+item.label+'</option>';
+                                    });
+                                    htmlStr += '</select>'; 
+                                }
                             }
-
-                            htmlStr += '<input type="button" onclick="validateFormField();" value="提交申请（开启流程）">';
                             document.getElementById("flowInstanceForm").innerHTML = htmlStr;
                         }
 
                     },
                     error: function (result) {alert("加载流程动态表单字段配置失败，内部错误.");}
                 });
+
+                //2.流程人选择内容区域，用于开启流程时动态选择审批人
+                $.ajax({
+                    url:  window.location.origin + contextPath + '/workFlowNodes/list',
+                    data: JSON.stringify({
+                        pageNum: 1,
+                        pageSize: 100,
+                        data: {
+                            flowKey: flowKey
+                        }
+                    }),
+                    type: 'post',
+                    contentType: 'application/json;charset=utf-8',
+                    dataType: "json",
+                    success: function (res) {
+
+                        var htmlStr = "<tr>";
+                        htmlStr += "<th>ID</th>";
+                        htmlStr += "<th>流程定义key(flow_key)</th>";
+                        htmlStr += "<th>流程节点名称(node_name)</th>";
+                        htmlStr += "<th>节点类型(node_type)</th>";
+                        htmlStr += "<th>处理人(handler)</th>";
+                        htmlStr += "<th>处理人类型(handler_type)</th>";
+                        htmlStr += "<th>操作</th>";
+
+                        if(res.data.list.length >0){
+                            var list = res.data.list;
+                            for(var i=0;i<list.length;i++){
+                                htmlStr += "<tr>";
+                                htmlStr += "<td>"+list[i].id+"</td>";
+                                htmlStr += "<td>"+list[i].flowKey+"</td>";
+                                htmlStr += "<td>"+list[i].nodeName+"</td>";
+                                htmlStr += "<td>"+list[i].nodeType+"</td>";
+                                htmlStr += "<td>"+list[i].handler+"</td>";
+                                htmlStr += "<td>"+list[i].handlerType+"</td>";
+                                
+                                //按钮列表
+                                htmlStr += "<td>";
+                                if(list[i].handlerType === "fromForm"){
+                                    htmlStr += "<a>选择审批人</a>";
+                                    htmlStr += '<select class="selectUser" id="selectUserId_'+list[i].id+'" name="selectUserId_'+list[i].id+'">';
+                                    htmlStr += '<option value ="liujh">部门经理（liujh）</option>';
+                                    htmlStr += '<option value ="linjh">部门经理（linjh）</option>';
+                                    htmlStr += '<option value ="huangjc">部门经理（huangjc）</option>';
+                                    htmlStr += '<option value ="zhaoyl">项目经理（zhaoyl）</option>';
+                                    htmlStr += '<option value ="lix">申请人员（lix）</option>';
+                                    htmlStr += '<option value ="xuw">总经理（xuw）</option>';
+                                    htmlStr += '</select>'; 
+                                }else{
+                                    htmlStr += "&nbsp;";
+                                }
+                                htmlStr += "</td>";
+                                htmlStr += "</tr>";
+                            
+                            }
+                            
+                        }
+
+                        document.getElementById("handlerList").innerHTML = htmlStr;
+                        
+                    },
+                    error: function (result) {alert("加载流程节点配置及审批人列表失败，内部错误.");}
+                });
+
 
             });
 
@@ -138,6 +226,19 @@
                 params.flowKey = flowKey;
                 params.userId = userId;
                 params.formJson = formJson;
+
+                //获取各环节选择的审批人，一起提交给后端，启动流程时修改审批人
+                var approveUserList = [];
+                var selectUser = $('.selectUser');
+                selectUser.each(function(index, item){
+                    var obj=document.getElementById(item.id);//selectUserId_17
+                    var index=obj.selectedIndex; //序号，取当前选中选项的序号
+                    var userId = obj.options[index].value
+                    var idArray = item.id.split("_");//selectUserId_17
+                    approveUserList.push({"flowNodeId": Number(idArray[1]),"userId":userId});
+                });
+
+                params.approveUserList = approveUserList;
 
                 //提交动态表单并开启新的流程
                 $.ajax({
